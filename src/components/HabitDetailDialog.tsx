@@ -23,7 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { amountFor, frequencyLabel, weeklyQuotaProgress } from "@/lib/cadence";
 import { today } from "@/lib/date";
-import { identityForHabit } from "@/lib/identity";
+import { identitiesForHabit } from "@/lib/identity";
 import { windowLabel, habitWindowFor } from "@/lib/schedule";
 import { isActive } from "@/lib/stats";
 import { cn } from "@/lib/utils";
@@ -73,7 +73,7 @@ export default function HabitDetailDialog({
   const done = Boolean(logs[habit.id]?.[t]);
   const window = habitWindowFor(t, habit, timetables);
   const todoDone = habit.todos.filter((todo) => todo.done).length;
-  const identity = identityForHabit(identities, habit);
+  const links = identitiesForHabit(identities, habit);
   const amount = amountFor(progress, habit.id, t);
   const metricPct = habit.metric
     ? Math.min(100, Math.round((amount / habit.metric.target) * 100))
@@ -93,8 +93,9 @@ export default function HabitDetailDialog({
           <DialogDescription asChild>
             <div className="flex flex-wrap items-center gap-1.5">
               {category && <CategoryBadge category={category} />}
-              {identity && (
+              {links.map((identity) => (
                 <Badge
+                  key={identity.id}
                   variant="outline"
                   style={{
                     borderColor: `color-mix(in oklch, ${identity.color} 40%, transparent)`,
@@ -103,7 +104,7 @@ export default function HabitDetailDialog({
                 >
                   {identity.emoji} I am becoming {identity.statement}
                 </Badge>
-              )}
+              ))}
               {window && (
                 <Badge
                   variant="outline"

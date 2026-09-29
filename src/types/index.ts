@@ -65,8 +65,8 @@ export interface Habit {
   todos: HabitTodo[];
   /** Reference links (title + url) shown in the habit detail modal. */
   resources: HabitResource[];
-  /** Identity this habit casts a vote for, or null. */
-  identityId: string | null;
+  /** Identities this habit casts a vote for (empty when unlinked). */
+  identityIds: string[];
   /** Whether the habit is being built or limited. */
   kind: HabitKind;
   /** How often the habit is expected (defaults to daily). */

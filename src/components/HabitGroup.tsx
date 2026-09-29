@@ -12,6 +12,7 @@ import CategoryIcon from "./CategoryIcon";
 import HabitListItem from "./HabitListItem";
 import { isScheduled } from "@/lib/cadence";
 import { today } from "@/lib/date";
+import { identitiesForHabit } from "@/lib/identity";
 import { cn } from "@/lib/utils";
 import type {
   Category,
@@ -107,7 +108,7 @@ export default function HabitGroup({
                 key={habit.id}
                 habit={habit}
                 category={category}
-                identity={identities.find((i) => i.id === habit.identityId)}
+                identities={identitiesForHabit(identities, habit)}
                 anchorName={
                   habit.anchorHabitId ? habitNames[habit.anchorHabitId] : undefined
                 }

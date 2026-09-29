@@ -132,17 +132,17 @@ export function useHabitStore() {
 
     // Cast an identity "vote" reward when a new check-in lands.
     if (before && !wasDone && current) {
+      const snapshot = current;
       const habit = before.habits.find((h) => h.id === id);
-      const identity =
-        habit?.identityId && before.identities.find((i) => i.id === habit.identityId);
-      if (identity) {
-        const votes = monthlyVotes(
+      const entries = (habit?.identityIds ?? [])
+        .map((iid) => before.identities.find((i) => i.id === iid))
+        .filter((i): i is Identity => Boolean(i))
+        .map((identity) => ({
           identity,
-          current.habits,
-          current.logs,
-          today(),
-        );
-        toast(identityVoteToast(identity, votes), { duration: 4000 });
+          votes: monthlyVotes(identity, snapshot.habits, snapshot.logs, today()),
+        }));
+      if (entries.length) {
+        toast(identityVoteToast(entries), { duration: 4000 });
       }
     }
   }, []);
@@ -355,7 +355,9 @@ export function useHabitStore() {
     patchState((x) => ({
       identities: x.identities.filter((identity) => identity.id !== id),
       habits: x.habits.map((habit) =>
-        habit.identityId === id ? { ...habit, identityId: null } : habit,
+        habit.identityIds.includes(id)
+          ? { ...habit, identityIds: habit.identityIds.filter((x) => x !== id) }
+          : habit,
       ),
     }));
   }, []);

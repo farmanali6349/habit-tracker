@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { useNow } from "@/hooks/useNow";
 import { groupHabitsByCategory, uncategorizedCategory } from "@/lib/categories";
 import { today } from "@/lib/date";
+import { identitiesForHabit } from "@/lib/identity";
 import { compareByMoment, resolveHabitMoments } from "@/lib/schedule";
 import type { Habit, HabitMomentInfo } from "@/types";
 
@@ -127,7 +128,7 @@ export default function HabitsSection() {
                 key={habit.id}
                 habit={habit}
                 category={categoryById.get(habit.categoryId) ?? uncategorizedCategory()}
-                identity={identities.find((i) => i.id === habit.identityId)}
+                identities={identitiesForHabit(identities, habit)}
                 anchorName={habit.anchorHabitId ? habitNames[habit.anchorHabitId] : undefined}
                 logs={logs}
                 stats={stats[habit.id]}

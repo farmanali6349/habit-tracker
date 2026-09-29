@@ -22,15 +22,16 @@ export const DEFAULT_IDENTITY_EMOJI = IDENTITY_EMOJIS[0];
 export const habitsForIdentity = (
   habits: Habit[],
   identityId: string,
-): Habit[] => habits.filter((habit) => habit.identityId === identityId);
+): Habit[] => habits.filter((habit) => habit.identityIds.includes(identityId));
 
-export const identityForHabit = (
+/** Resolves the identities a habit casts votes for, in link order. */
+export const identitiesForHabit = (
   identities: Identity[],
   habit: Habit,
-): Identity | undefined =>
-  habit.identityId
-    ? identities.find((identity) => identity.id === habit.identityId)
-    : undefined;
+): Identity[] =>
+  habit.identityIds
+    .map((id) => identities.find((identity) => identity.id === id))
+    .filter((identity): identity is Identity => Boolean(identity));
 
 /** Check-ins cast for an identity's habits within an inclusive date range. */
 export const identityVotes = (
@@ -59,7 +60,13 @@ export const monthlyVotes = (
   today: string,
 ): number => identityVotes(identity, habits, logs, addDays(today, -29), today);
 
-export const identityVoteToast = (identity: Identity, votes: number): string =>
-  `Vote cast for “${identity.statement}” — ${votes} ${
-    votes === 1 ? "vote" : "votes"
-  } in the last 30 days.`;
+export const identityVoteToast = (
+  entries: { identity: Identity; votes: number }[],
+): string => {
+  const parts = entries.map(
+    ({ identity, votes }) =>
+      `“${identity.statement}” — ${votes} ${votes === 1 ? "vote" : "votes"}`,
+  );
+  const lead = entries.length === 1 ? "Vote cast for" : "Votes cast for";
+  return `${lead} ${parts.join(", ")} in the last 30 days.`;
+};

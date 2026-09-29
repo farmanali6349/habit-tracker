@@ -110,7 +110,7 @@ export default function OnboardingDialog({ onClose }: { onClose: () => void }) {
           description: "",
           todos: [],
           resources: [],
-          identityId: firstIdentityId,
+          identityIds: firstIdentityId ? [firstIdentityId] : [],
           kind: "build",
           frequency: { kind: "daily" },
           metric: null,

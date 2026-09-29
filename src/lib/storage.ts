@@ -55,7 +55,7 @@ export const defaultState = (): AppState => ({
 
 /** Legacy shape: the category lived on the habit as a free-text `cat` string. */
 type RawState = Partial<Omit<AppState, "habits">> & {
-  habits?: (Partial<Habit> & { cat?: string })[];
+  habits?: (Partial<Habit> & { cat?: string; identityId?: unknown })[];
 };
 
 const sanitizeSleep = (raw: unknown): SleepLog => {
@@ -195,6 +195,19 @@ const sanitizeIdentities = (raw: unknown): Identity[] => {
       },
     ];
   });
+};
+
+const sanitizeIdentityIds = (
+  raw: unknown,
+  legacy: unknown,
+  valid: Set<string>,
+): string[] => {
+  const ids = Array.isArray(raw)
+    ? raw.filter((value): value is string => typeof value === "string" && valid.has(value))
+    : [];
+  // Back-compat: pre-multi-identity backups stored a single `identityId`.
+  if (typeof legacy === "string" && valid.has(legacy)) ids.push(legacy);
+  return [...new Set(ids)];
 };
 
 const sanitizeProgress = (raw: unknown): ProgressLog => {
@@ -354,7 +367,7 @@ export const migrateState = (raw: unknown): AppState | null => {
   };
 
   const identities = sanitizeIdentities(input.identities);
-  const identityIds = new Set(identities.map((identity) => identity.id));
+  const validIdentityIds = new Set(identities.map((identity) => identity.id));
   const habitIds = new Set<string>();
   for (const habit of input.habits) {
     if (typeof habit.id === "string" && habit.id) habitIds.add(habit.id);
@@ -374,10 +387,11 @@ export const migrateState = (raw: unknown): AppState | null => {
         typeof habit.description === "string" ? habit.description : "",
       todos: sanitizeTodos(habit.todos),
       resources: sanitizeResources(habit.resources),
-      identityId:
-        typeof habit.identityId === "string" && identityIds.has(habit.identityId)
-          ? habit.identityId
-          : null,
+      identityIds: sanitizeIdentityIds(
+        habit.identityIds,
+        habit.identityId,
+        validIdentityIds,
+      ),
       kind: habit.kind === "limit" ? ("limit" as const) : ("build" as const),
       frequency: validFrequency(habit.frequency) ?? { kind: "daily" as const },
       metric: validMetric(habit.metric),

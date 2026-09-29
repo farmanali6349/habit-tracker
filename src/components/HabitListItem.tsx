@@ -55,7 +55,7 @@ const STRIP_DAYS = 14;
 interface HabitListItemProps {
   habit: Habit;
   category: Category;
-  identity?: Identity;
+  identities?: Identity[];
   anchorName?: string;
   logs: HabitLogs;
   stats: HabitStats;
@@ -71,7 +71,7 @@ interface HabitListItemProps {
 export default function HabitListItem({
   habit,
   category,
-  identity,
+  identities = [],
   anchorName,
   logs,
   stats,
@@ -171,8 +171,9 @@ export default function HabitListItem({
 
         <div className="flex flex-wrap items-center gap-1.5">
           <CategoryBadge category={category} />
-          {identity && (
+          {identities.map((identity) => (
             <Badge
+              key={identity.id}
               variant="outline"
               style={{
                 borderColor: `color-mix(in oklch, ${identity.color} 40%, transparent)`,
@@ -181,7 +182,7 @@ export default function HabitListItem({
             >
               {identity.emoji} {identity.statement}
             </Badge>
-          )}
+          ))}
           {window && (
             <Badge
               variant="outline"

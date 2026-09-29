@@ -81,7 +81,7 @@ export default function HabitFormDialog({
       description: "",
       todos: [],
       resources: [],
-      identityId: null,
+      identityIds: [],
       kind: "build",
       frequency: { kind: "daily" },
       metric: null,
@@ -252,30 +252,36 @@ export default function HabitFormDialog({
 
           {identities.length > 0 && (
             <div className="grid gap-2">
-              <Label htmlFor="habit-identity">Identity</Label>
-              <Select
-                value={form.identityId ?? "none"}
-                onValueChange={(value) =>
-                  setForm({
-                    ...form,
-                    identityId: value === "none" ? null : value,
-                  })
-                }
-              >
-                <SelectTrigger id="habit-identity" className="w-full">
-                  <SelectValue placeholder="No identity" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No identity</SelectItem>
-                  {identities.map((identity) => (
-                    <SelectItem key={identity.id} value={identity.id}>
-                      {identity.emoji} I am becoming {identity.statement}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Identities (optional)</Label>
+              <div className="grid gap-2 rounded-lg border p-2">
+                {identities.map((identity) => {
+                  const id = `habit-identity-${identity.id}`;
+                  return (
+                    <div key={identity.id} className="flex items-center gap-2">
+                      <Checkbox
+                        id={id}
+                        checked={form.identityIds.includes(identity.id)}
+                        onCheckedChange={(checked) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            identityIds:
+                              checked === true
+                                ? [...prev.identityIds, identity.id]
+                                : prev.identityIds.filter(
+                                    (value) => value !== identity.id,
+                                  ),
+                          }))
+                        }
+                      />
+                      <Label htmlFor={id} className="font-normal">
+                        {identity.emoji} I am becoming {identity.statement}
+                      </Label>
+                    </div>
+                  );
+                })}
+              </div>
               <p className="text-xs text-muted-foreground">
-                Completing this habit casts a vote for the identity.
+                Each check-in casts a vote for every identity you link here.
               </p>
             </div>
           )}

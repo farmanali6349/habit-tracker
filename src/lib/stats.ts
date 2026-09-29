@@ -187,7 +187,7 @@ export const computeBadges = (
   const tracked = s30.filter((d) => d.a);
   const topBest = Math.max(0, ...habits.map((h) => stats[h.id]?.best ?? 0));
   const identityCheckIns = habits
-    .filter((h) => h.identityId)
+    .filter((h) => h.identityIds.length > 0)
     .reduce((sum, h) => sum + Object.keys(L[h.id] || {}).length, 0);
   return [
     {
