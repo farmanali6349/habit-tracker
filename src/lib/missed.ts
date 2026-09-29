@@ -8,9 +8,10 @@ import type {
   MissedLog,
   MissedReasonStat,
   MissedRollup,
+  SkipLog,
 } from "@/types";
+import { isScheduled, isSkipped } from "./cadence";
 import { addDays, today } from "./date";
-import { isActive } from "./stats";
 
 /** One-tap reasons offered when flagging a habit missed. */
 export const MISSED_REASON_PRESETS: string[] = [
@@ -69,6 +70,7 @@ export const buildMissedRollup = (
   logs: HabitLogs,
   missed: MissedLog,
   { windowDays = 90, limit = 6 }: RollupOptions = {},
+  skips?: SkipLog,
 ): MissedRollup => {
   const t = today();
   const categoryById = new Map(categories.map((c) => [c.id, c]));
@@ -86,7 +88,7 @@ export const buildMissedRollup = (
     let dayMissed = 0;
 
     for (const habit of habits) {
-      if (!isActive(habit, date)) continue;
+      if (!isScheduled(habit, date) || isSkipped(skips, habit.id, date)) continue;
       if (logs[habit.id]?.[date]) done += 1;
     }
 
@@ -94,7 +96,7 @@ export const buildMissedRollup = (
       const entry = dates[date];
       if (!entry) continue;
       const habit = habitById.get(habitId);
-      if (!habit || !isActive(habit, date)) continue;
+      if (!habit || !isScheduled(habit, date)) continue;
 
       totalMissed += 1;
       dayMissed += 1;
@@ -123,7 +125,7 @@ export const buildMissedRollup = (
       const habit = habitById.get(habitId)!;
       let active = 0;
       for (let i = 0; i < windowDays; i += 1) {
-        if (isActive(habit, addDays(t, -i))) active += 1;
+        if (isScheduled(habit, addDays(t, -i))) active += 1;
       }
       return {
         habit,

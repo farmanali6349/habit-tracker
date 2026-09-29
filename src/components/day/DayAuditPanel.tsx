@@ -26,6 +26,7 @@ import type {
   MissedEntry,
   MissedLog,
   PlanEntry,
+  SkipLog,
   SleepEntry,
   TimeTable,
 } from "@/types";
@@ -36,11 +37,13 @@ interface DayAuditPanelProps {
   categories: Category[];
   logs: HabitLogs;
   missed: MissedLog;
+  skips: SkipLog;
   sleep: SleepEntry | undefined;
   timetables: TimeTable[];
   onToggle: (id: string, date: string) => void;
   onMarkMissed: (id: string, date: string) => void;
   onUnmarkMissed: (id: string, date: string) => void;
+  onSkip: (id: string, date: string) => void;
   onSaveMissedNote: (
     id: string,
     date: string,
@@ -55,19 +58,21 @@ export default function DayAuditPanel({
   categories,
   logs,
   missed,
+  skips,
   sleep,
   timetables,
   onToggle,
   onMarkMissed,
   onUnmarkMissed,
+  onSkip,
   onSaveMissedNote,
   onSetSleep,
 }: DayAuditPanelProps) {
   const [editing, setEditing] = useState<Habit | null>(null);
 
   const audit = useMemo(
-    () => buildDayAudit(date, habits, categories, logs, sleep, missed),
-    [date, habits, categories, logs, sleep, missed],
+    () => buildDayAudit(date, habits, categories, logs, sleep, missed, skips),
+    [date, habits, categories, logs, sleep, missed, skips],
   );
 
   const plan = useMemo(
@@ -124,6 +129,7 @@ export default function DayAuditPanel({
               onMiss={openNote}
               onUnmark={(habitId) => onUnmarkMissed(habitId, date)}
               onEditNote={openNote}
+              onSkip={(habitId) => onSkip(habitId, date)}
             />
           ) : (
             <Empty className="border">

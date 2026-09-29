@@ -1,8 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Inter } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import AppProvider from "@/components/shell/AppProvider";
 import AppShell from "@/components/shell/AppShell";
+import ServiceWorkerRegistrar from "@/components/shell/ServiceWorkerRegistrar";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -21,6 +22,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Habit Tracker",
   description: "Track daily habits, streaks, and analytics right in your browser.",
+  manifest: "/manifest.json",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0a0a0a",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -41,6 +47,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <AppProvider>
               <AppShell>{children}</AppShell>
             </AppProvider>
+            <ServiceWorkerRegistrar />
             <Toaster position="bottom-right" />
           </TooltipProvider>
         </ThemeProvider>

@@ -10,8 +10,8 @@ import {
 import { Progress } from "@/components/ui/progress";
 import CategoryIcon from "./CategoryIcon";
 import HabitListItem from "./HabitListItem";
+import { isScheduled } from "@/lib/cadence";
 import { today } from "@/lib/date";
-import { isActive } from "@/lib/stats";
 import { cn } from "@/lib/utils";
 import type {
   Category,
@@ -19,11 +19,15 @@ import type {
   HabitLogs,
   HabitMomentInfo,
   HabitStats,
+  Identity,
 } from "@/types";
 
 interface HabitGroupProps {
   category: Category;
   habits: Habit[];
+  identities: Identity[];
+  /** habitId → name, for resolving stack anchors. */
+  habitNames: Record<string, string>;
   logs: HabitLogs;
   stats: Record<string, HabitStats>;
   /** habitId → live window + status for today. */
@@ -39,6 +43,8 @@ interface HabitGroupProps {
 export default function HabitGroup({
   category,
   habits,
+  identities,
+  habitNames,
   logs,
   stats,
   moments,
@@ -52,7 +58,7 @@ export default function HabitGroup({
   const [open, setOpen] = useState(defaultOpen);
   const t = today();
 
-  const active = habits.filter((h) => isActive(h, t));
+  const active = habits.filter((h) => isScheduled(h, t));
   const done = active.filter((h) => Boolean(logs[h.id]?.[t])).length;
   const pct = active.length ? Math.round((done / active.length) * 100) : 0;
 
@@ -101,6 +107,10 @@ export default function HabitGroup({
                 key={habit.id}
                 habit={habit}
                 category={category}
+                identity={identities.find((i) => i.id === habit.identityId)}
+                anchorName={
+                  habit.anchorHabitId ? habitNames[habit.anchorHabitId] : undefined
+                }
                 logs={logs}
                 stats={stats[habit.id]}
                 info={moments.get(habit.id)}

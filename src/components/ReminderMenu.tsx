@@ -1,6 +1,6 @@
 "use client";
 
-import { BellIcon, PlayIcon } from "lucide-react";
+import { BellIcon, PlayIcon, XIcon } from "lucide-react";
 import { useApp } from "@/components/shell/AppProvider";
 import TimeField from "@/components/TimeField";
 import { Button } from "@/components/ui/button";
@@ -40,8 +40,9 @@ export default function ReminderMenu() {
     setRemindSound,
     setRemindTone,
     setRemindLead,
+    saveHabit,
   } = useApp();
-  const { remind, rt, remindSound, remindTone, remindLead } = state;
+  const { remind, rt, remindSound, remindTone, remindLead, habits } = state;
 
   return (
     <Popover>
@@ -67,7 +68,7 @@ export default function ReminderMenu() {
         <PopoverHeader>
           <PopoverTitle>Reminders</PopoverTitle>
           <PopoverDescription>
-            Alerts for habits as their timetable slots come up.
+            Alerts for habit times and timetable slots.
           </PopoverDescription>
         </PopoverHeader>
 
@@ -162,6 +163,46 @@ export default function ReminderMenu() {
                 A nudge if habits are still pending.
               </p>
             </div>
+
+            {habits.length > 0 && (
+              <div className="grid gap-2 border-t pt-2.5">
+                <Label className="text-xs text-muted-foreground">
+                  Per-habit cues
+                </Label>
+                <div className="max-h-48 space-y-1.5 overflow-y-auto pe-1">
+                  {habits.map((habit) => (
+                    <div key={habit.id} className="flex items-center gap-2">
+                      <span
+                        className="min-w-0 flex-1 truncate text-xs"
+                        title={habit.name}
+                      >
+                        {habit.name}
+                      </span>
+                      <TimeField
+                        value={habit.remindTime}
+                        onChange={(value) =>
+                          saveHabit({ ...habit, remindTime: value })
+                        }
+                        placeholder="Set time"
+                        className="h-7 w-28 text-xs"
+                      />
+                      {habit.remindTime && (
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          aria-label={`Clear reminder for ${habit.name}`}
+                          onClick={() =>
+                            saveHabit({ ...habit, remindTime: null })
+                          }
+                        >
+                          <XIcon />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </>
         )}
       </PopoverContent>

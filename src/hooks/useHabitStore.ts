@@ -1,22 +1,29 @@
 "use client";
 
 import { useCallback, useEffect, useSyncExternalStore } from "react";
+import { toast } from "sonner";
 import type {
   AppState,
   Category,
   CategoryDraft,
   Habit,
   HabitDraft,
+  HabitProfile,
+  Identity,
+  IdentityDraft,
   MissedEntry,
   MissedLog,
+  ReviewDraft,
   SleepEntry,
   TimeSlotDraft,
   TimeTable,
   TimeTableDraft,
+  WeeklyReview,
 } from "@/types";
 import { today } from "@/lib/date";
 import { minutesToTime } from "@/lib/day";
 import { UNCATEGORIZED_ID, uncategorizedCategory } from "@/lib/categories";
+import { identityVoteToast, monthlyVotes } from "@/lib/identity";
 import { loadState, migrateState, saveState, defaultState } from "@/lib/storage";
 import { uid } from "@/lib/stats";
 import { sortSlots } from "@/lib/timetable";
@@ -70,6 +77,31 @@ function withMissedDate(
   return next;
 }
 
+/** Removes `habitId`/`date` from a `habitId → date → value` map (drop empty). */
+function withoutDate<T>(
+  map: Record<string, Record<string, T>>,
+  habitId: string,
+  date: string,
+): Record<string, Record<string, T>> {
+  const forHabit = { ...(map[habitId] || {}) };
+  delete forHabit[date];
+
+  const next = { ...map };
+  if (Object.keys(forHabit).length) next[habitId] = forHabit;
+  else delete next[habitId];
+  return next;
+}
+
+/** Sets `habitId`/`date` to `value` in a `habitId → date → value` map. */
+function withDate<T>(
+  map: Record<string, Record<string, T>>,
+  habitId: string,
+  date: string,
+  value: T,
+): Record<string, Record<string, T>> {
+  return { ...map, [habitId]: { ...(map[habitId] || {}), [date]: value } };
+}
+
 export function useHabitStore() {
   const state = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
@@ -81,19 +113,38 @@ export function useHabitStore() {
   const update = useCallback((patch: Patch) => patchState(patch), []);
 
   const toggleLog = useCallback((id: string, d: string) => {
+    const before = current;
+    const wasDone = Boolean(before?.logs[id]?.[d]);
     patchState((x) => {
       const logs = { ...(x.logs[id] || {}) };
       if (logs[d]) {
         delete logs[d];
         return { logs: { ...x.logs, [id]: logs } };
       }
-      // Completing a habit clears any "missed" flag for that day.
+      // Completing a habit clears any "missed" or "rest day" flag for that day.
       logs[d] = new Date().toISOString();
       return {
         logs: { ...x.logs, [id]: logs },
         missed: withMissedDate(x.missed, id, d, null),
+        skips: withoutDate(x.skips, id, d),
       };
     });
+
+    // Cast an identity "vote" reward when a new check-in lands.
+    if (before && !wasDone && current) {
+      const habit = before.habits.find((h) => h.id === id);
+      const identity =
+        habit?.identityId && before.identities.find((i) => i.id === habit.identityId);
+      if (identity) {
+        const votes = monthlyVotes(
+          identity,
+          current.habits,
+          current.logs,
+          today(),
+        );
+        toast(identityVoteToast(identity, votes), { duration: 4000 });
+      }
+    }
   }, []);
 
   const markMissed = useCallback((id: string, date: string) => {
@@ -109,6 +160,8 @@ export function useHabitStore() {
       delete logs[date];
       return {
         logs: { ...x.logs, [id]: logs },
+        progress: withoutDate(x.progress, id, date),
+        skips: withoutDate(x.skips, id, date),
         missed: withMissedDate(x.missed, id, date, entry),
       };
     });
@@ -116,6 +169,49 @@ export function useHabitStore() {
 
   const unmarkMissed = useCallback((id: string, date: string) => {
     patchState((x) => ({ missed: withMissedDate(x.missed, id, date, null) }));
+  }, []);
+
+  const skipHabit = useCallback((id: string, date: string) => {
+    patchState((x) => {
+      const logs = { ...(x.logs[id] || {}) };
+      delete logs[date];
+      return {
+        logs: { ...x.logs, [id]: logs },
+        progress: withoutDate(x.progress, id, date),
+        missed: withMissedDate(x.missed, id, date, null),
+        skips: withDate(x.skips, id, date, true as const),
+      };
+    });
+  }, []);
+
+  const unskipHabit = useCallback((id: string, date: string) => {
+    patchState((x) => ({ skips: withoutDate(x.skips, id, date) }));
+  }, []);
+
+  /** Records partial/quantity progress; mirrors `logs` when the target is met. */
+  const setProgress = useCallback((id: string, date: string, amount: number) => {
+    patchState((x) => {
+      const habit = x.habits.find((h) => h.id === id);
+      const target = habit?.metric?.target ?? 0;
+      const value = Math.max(0, Math.round(amount));
+      const progress = value
+        ? withDate(x.progress, id, date, value)
+        : withoutDate(x.progress, id, date);
+
+      const logs = { ...(x.logs[id] || {}) };
+      if (target > 0 && value >= target) {
+        logs[date] = new Date().toISOString();
+        return {
+          progress,
+          logs: { ...x.logs, [id]: logs },
+          missed: withMissedDate(x.missed, id, date, null),
+          skips: withoutDate(x.skips, id, date),
+        };
+      }
+
+      delete logs[date];
+      return { progress, logs: { ...x.logs, [id]: logs } };
+    });
   }, []);
 
   const saveMissedNote = useCallback(
@@ -187,7 +283,20 @@ export function useHabitStore() {
       delete logs[id];
       const missed = { ...x.missed };
       delete missed[id];
-      return { habits: x.habits.filter((h) => h.id !== id), logs, missed };
+      const progress = { ...x.progress };
+      delete progress[id];
+      const skips = { ...x.skips };
+      delete skips[id];
+      // Detach any habits stacked after this one.
+      return {
+        habits: x.habits.map((h) =>
+          h.anchorHabitId === id ? { ...h, anchorHabitId: null } : h,
+        ).filter((h) => h.id !== id),
+        logs,
+        missed,
+        progress,
+        skips,
+      };
     });
   }, []);
 
@@ -222,6 +331,69 @@ export function useHabitStore() {
       };
     });
   }, []);
+
+  const saveIdentity = useCallback((draft: IdentityDraft) => {
+    patchState((x) => ({
+      identities: draft.id
+        ? x.identities.map((identity) =>
+            identity.id === draft.id
+              ? ({ ...identity, ...draft } as Identity)
+              : identity,
+          )
+        : [
+            ...x.identities,
+            {
+              ...draft,
+              id: uid(),
+              createdAt: new Date().toISOString(),
+            } as Identity,
+          ],
+    }));
+  }, []);
+
+  const deleteIdentity = useCallback((id: string) => {
+    patchState((x) => ({
+      identities: x.identities.filter((identity) => identity.id !== id),
+      habits: x.habits.map((habit) =>
+        habit.identityId === id ? { ...habit, identityId: null } : habit,
+      ),
+    }));
+  }, []);
+
+  const saveReview = useCallback((draft: ReviewDraft) => {
+    patchState((x) => {
+      if (draft.id) {
+        return {
+          reviews: x.reviews.map((review) =>
+            review.id === draft.id
+              ? ({ ...review, ...draft } as WeeklyReview)
+              : review,
+          ),
+        };
+      }
+      const created: WeeklyReview = {
+        ...draft,
+        id: uid(),
+        ts: new Date().toISOString(),
+      };
+      return { reviews: [created, ...x.reviews] };
+    });
+  }, []);
+
+  const deleteReview = useCallback((id: string) => {
+    patchState((x) => ({
+      reviews: x.reviews.filter((review) => review.id !== id),
+    }));
+  }, []);
+
+  const setProfile = useCallback((patch: Partial<HabitProfile>) => {
+    patchState((x) => ({ profile: { ...x.profile, ...patch } }));
+  }, []);
+
+  const setOnboarded = useCallback(
+    (value: boolean) => patchState({ onboarded: value }),
+    [],
+  );
 
   const setSleep = useCallback((date: string, patch: Partial<SleepEntry>) => {
     patchState((x) => {
@@ -370,6 +542,15 @@ export function useHabitStore() {
     toggleHabitTodo,
     saveCategory,
     deleteCategory,
+    saveIdentity,
+    deleteIdentity,
+    saveReview,
+    deleteReview,
+    setProfile,
+    setOnboarded,
+    setProgress,
+    skipHabit,
+    unskipHabit,
     setSleep,
     saveTimetable,
     deleteTimetable,

@@ -15,17 +15,18 @@ export default function AuditSection() {
     toggleLog,
     markMissed,
     unmarkMissed,
+    skipHabit,
     saveMissedNote,
     setSleep,
   } = useApp();
-  const { habits, categories, logs, sleep, timetables, missed } = state;
+  const { habits, categories, logs, sleep, timetables, missed, skips } = state;
   const [date, setDate] = useState(today);
   const t = today();
   const entry = sleep[date];
 
   const audit = useMemo(
-    () => buildDayAudit(date, habits, categories, logs, entry, missed),
-    [date, habits, categories, logs, entry, missed],
+    () => buildDayAudit(date, habits, categories, logs, entry, missed, skips),
+    [date, habits, categories, logs, entry, missed, skips],
   );
 
   const reviewedPct = audit.activeCount
@@ -98,11 +99,13 @@ export default function AuditSection() {
         categories={categories}
         logs={logs}
         missed={missed}
+        skips={skips}
         sleep={entry}
         timetables={timetables}
         onToggle={toggleLog}
         onMarkMissed={markMissed}
         onUnmarkMissed={unmarkMissed}
+        onSkip={skipHabit}
         onSaveMissedNote={saveMissedNote}
         onSetSleep={setSleep}
       />

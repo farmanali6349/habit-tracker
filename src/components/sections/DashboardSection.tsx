@@ -7,12 +7,15 @@ import ActivityHeatmap from "@/components/analytics/ActivityHeatmap";
 import InsightsList from "@/components/analytics/InsightsList";
 import NowCard from "@/components/dashboard/NowCard";
 import PlanSnapshotCard from "@/components/dashboard/PlanSnapshotCard";
+import RecoveryCard from "@/components/dashboard/RecoveryCard";
 import RecentActivityCard from "@/components/dashboard/RecentActivityCard";
 import TodayProgressCard from "@/components/dashboard/TodayProgressCard";
 import TodayTasksCard from "@/components/dashboard/TodayTasksCard";
 import UpcomingGoalsCard from "@/components/dashboard/UpcomingGoalsCard";
+import WeeklyReviewCard from "@/components/dashboard/WeeklyReviewCard";
 import FollowUpsCard from "@/components/day/FollowUpsCard";
 import SleepLogger from "@/components/day/SleepLogger";
+import IdentityCard from "@/components/dashboard/IdentityCard";
 import { useApp } from "@/components/shell/AppProvider";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,7 +44,8 @@ const greeting = (): string => {
 
 export default function DashboardSection() {
   const { state, derived, toggleLog, setSleep } = useApp();
-  const { habits, categories, logs, sleep, timetables, missed } = state;
+  const { habits, categories, logs, sleep, timetables, missed, skips, identities } =
+    state;
   const { badges, feed, active, doneToday, todayPct, topStreak } = derived;
   const hasHistory = Object.keys(logs).length > 0 || timetables.length > 0;
   const now = useNow();
@@ -50,8 +54,8 @@ export default function DashboardSection() {
   const entry = sleep[t];
 
   const audit = useMemo(
-    () => buildDayAudit(t, habits, categories, logs, entry, missed),
-    [t, habits, categories, logs, entry, missed],
+    () => buildDayAudit(t, habits, categories, logs, entry, missed, skips),
+    [t, habits, categories, logs, entry, missed, skips],
   );
 
   const comparison = useMemo(
@@ -65,13 +69,13 @@ export default function DashboardSection() {
   );
 
   const heat = useMemo(
-    () => heatmapData(habits, logs, HEATMAP_DAYS),
-    [habits, logs],
+    () => heatmapData(habits, logs, HEATMAP_DAYS, skips),
+    [habits, logs, skips],
   );
 
   const insights = useMemo(
-    () => generateInsights(habits, categories, logs, sleep, timetables),
-    [habits, categories, logs, sleep, timetables],
+    () => generateInsights(habits, categories, logs, sleep, timetables, skips),
+    [habits, categories, logs, sleep, timetables, skips],
   );
 
   const earned = badges.filter((badge) => badge.earned).length;
@@ -114,6 +118,8 @@ export default function DashboardSection() {
         onToggle={toggleLog}
       />
 
+      <RecoveryCard />
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <TodayProgressCard
           percent={todayPct}
@@ -142,6 +148,10 @@ export default function DashboardSection() {
       />
 
       <FollowUpsCard fromDate={addDays(t, -1)} />
+
+      <IdentityCard identities={identities} habits={habits} logs={logs} />
+
+      <WeeklyReviewCard />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <PlanSnapshotCard

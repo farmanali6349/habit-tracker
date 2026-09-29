@@ -4,6 +4,7 @@ import {
   CheckIcon,
   CircleIcon,
   MessageSquarePlusIcon,
+  MoonIcon,
   PencilIcon,
   Undo2Icon,
   XIcon,
@@ -34,6 +35,7 @@ interface ReviewRowProps {
   onMiss: () => void;
   onUnmark: () => void;
   onEditNote: () => void;
+  onSkip: () => void;
 }
 
 export default function ReviewRow({
@@ -44,6 +46,7 @@ export default function ReviewRow({
   onMiss,
   onUnmark,
   onEditNote,
+  onSkip,
 }: ReviewRowProps) {
   const habit = entry.habit;
   if (!habit) return null;
@@ -178,6 +181,15 @@ export default function ReviewRow({
               </Button>
             )}
             <Button
+              variant="ghost"
+              size="xs"
+              aria-label={`Take a rest day for ${habit.name}`}
+              onClick={onSkip}
+            >
+              <MoonIcon data-icon="inline-start" />
+              Rest
+            </Button>
+            <Button
               variant="outline"
               size="icon-xs"
               aria-label={`Did ${habit.name} after all`}
@@ -193,6 +205,17 @@ export default function ReviewRow({
             <Badge variant="outline" className="text-muted-foreground">
               Pending
             </Badge>
+            {canMiss && (
+              <Button
+                variant="ghost"
+                size="xs"
+                aria-label={`Take a rest day for ${habit.name}`}
+                onClick={onSkip}
+              >
+                <MoonIcon data-icon="inline-start" />
+                Rest
+              </Button>
+            )}
             {canMiss && (
               <Button
                 variant="outline"

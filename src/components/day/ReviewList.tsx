@@ -20,6 +20,7 @@ interface ReviewListProps {
   onMiss: (habitId: string) => void;
   onUnmark: (habitId: string) => void;
   onEditNote: (habitId: string) => void;
+  onSkip: (habitId: string) => void;
 }
 
 export default function ReviewList({
@@ -30,6 +31,7 @@ export default function ReviewList({
   onMiss,
   onUnmark,
   onEditNote,
+  onSkip,
 }: ReviewListProps) {
   const schedule = useMemo(() => {
     const map = new Map<string, number>();
@@ -94,6 +96,7 @@ export default function ReviewList({
                 onMiss={() => onMiss(entry.habit!.id)}
                 onUnmark={() => onUnmark(entry.habit!.id)}
                 onEditNote={() => onEditNote(entry.habit!.id)}
+                onSkip={() => onSkip(entry.habit!.id)}
               />
             ))}
           </ul>
@@ -131,6 +134,7 @@ export default function ReviewList({
                   onMiss={() => onMiss(entry.habit!.id)}
                   onUnmark={() => onUnmark(entry.habit!.id)}
                   onEditNote={() => onEditNote(entry.habit!.id)}
+                  onSkip={() => onSkip(entry.habit!.id)}
                 />
               ))}
             </ul>

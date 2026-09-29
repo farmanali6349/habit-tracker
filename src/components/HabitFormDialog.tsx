@@ -26,14 +26,36 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { UNCATEGORIZED_ID } from "@/lib/categories";
 import { minutesToTime } from "@/lib/day";
+import { anchorCandidates } from "@/lib/stacking";
 import { uid } from "@/lib/stats";
-import type { Category, Habit, HabitDraft, HabitResource } from "@/types";
+import type { Category, Habit, HabitDraft, HabitResource, Identity } from "@/types";
+
+const WEEKDAY_CHIPS = [
+  { value: 1, label: "Mon" },
+  { value: 2, label: "Tue" },
+  { value: 3, label: "Wed" },
+  { value: 4, label: "Thu" },
+  { value: 5, label: "Fri" },
+  { value: 6, label: "Sat" },
+  { value: 0, label: "Sun" },
+];
+
+const REMIND_LEAD_OPTIONS = [
+  { value: "0", label: "At the time" },
+  { value: "1", label: "1 min before" },
+  { value: "5", label: "5 min before" },
+  { value: "10", label: "10 min before" },
+  { value: "15", label: "15 min before" },
+];
 
 interface HabitFormDialogProps {
   habit: Habit | null;
   categories: Category[];
+  identities: Identity[];
+  habits: Habit[];
   onSave: (draft: HabitDraft) => void;
   onClose: () => void;
 }
@@ -41,6 +63,8 @@ interface HabitFormDialogProps {
 export default function HabitFormDialog({
   habit,
   categories,
+  identities,
+  habits,
   onSave,
   onClose,
 }: HabitFormDialogProps) {
@@ -57,6 +81,14 @@ export default function HabitFormDialog({
       description: "",
       todos: [],
       resources: [],
+      identityId: null,
+      kind: "build",
+      frequency: { kind: "daily" },
+      metric: null,
+      anchorHabitId: null,
+      anchorText: null,
+      remindTime: null,
+      remindLead: null,
     };
   });
   const [lifetime, setLifetime] = useState(!habit?.end);
@@ -79,6 +111,10 @@ export default function HabitFormDialog({
       ...form,
       name: form.name.trim(),
       end: lifetime ? null : form.end || null,
+      metric:
+        form.metric && form.metric.target > 0
+          ? { target: form.metric.target, unit: form.metric.unit.trim() }
+          : null,
       todos: form.todos
         .filter((todo) => todo.text.trim())
         .map((todo) => ({ ...todo, text: todo.text.trim() })),
@@ -195,6 +231,91 @@ export default function HabitFormDialog({
           </div>
 
           <div className="grid gap-2">
+            <Label>Type</Label>
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              size="sm"
+              value={form.kind}
+              onValueChange={(value) => {
+                if (value) setForm({ ...form, kind: value as "build" | "limit" });
+              }}
+            >
+              <ToggleGroupItem value="build">Build a habit</ToggleGroupItem>
+              <ToggleGroupItem value="limit">Reduce a habit</ToggleGroupItem>
+            </ToggleGroup>
+            <p className="text-xs text-muted-foreground">
+              For a habit you want to cut back on, a check-in means you resisted
+              that day.
+            </p>
+          </div>
+
+          {identities.length > 0 && (
+            <div className="grid gap-2">
+              <Label htmlFor="habit-identity">Identity</Label>
+              <Select
+                value={form.identityId ?? "none"}
+                onValueChange={(value) =>
+                  setForm({
+                    ...form,
+                    identityId: value === "none" ? null : value,
+                  })
+                }
+              >
+                <SelectTrigger id="habit-identity" className="w-full">
+                  <SelectValue placeholder="No identity" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No identity</SelectItem>
+                  {identities.map((identity) => (
+                    <SelectItem key={identity.id} value={identity.id}>
+                      {identity.emoji} I am becoming {identity.statement}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Completing this habit casts a vote for the identity.
+              </p>
+            </div>
+          )}
+
+          <div className="grid gap-2">
+            <Label htmlFor="habit-anchor">Stack after (optional)</Label>
+            <Select
+              value={form.anchorHabitId ?? "none"}
+              onValueChange={(value) =>
+                setForm({
+                  ...form,
+                  anchorHabitId: value === "none" ? null : value,
+                })
+              }
+            >
+              <SelectTrigger id="habit-anchor" className="w-full">
+                <SelectValue placeholder="Select a habit" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Nothing</SelectItem>
+                {anchorCandidates(habits, habit?.id).map((candidate) => (
+                  <SelectItem key={candidate.id} value={candidate.id}>
+                    {candidate.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input
+              placeholder="…or a cue, e.g. After I brush my teeth"
+              value={form.anchorText ?? ""}
+              onChange={(e) =>
+                setForm({ ...form, anchorText: e.target.value || null })
+              }
+            />
+            <p className="text-xs text-muted-foreground">
+              Tie this habit to an existing routine — “After X, I will Y”.
+            </p>
+          </div>
+
+          <div className="grid gap-2">
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="habit-start-time">Scheduled from</Label>
@@ -222,6 +343,197 @@ export default function HabitFormDialog({
             <p className="text-xs text-muted-foreground">
               The habit shows as ongoing between these times. A timetable slot
               for the day takes precedence.
+            </p>
+          </div>
+
+          <div className="grid gap-2">
+            <Label>Frequency</Label>
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              size="sm"
+              value={form.frequency.kind}
+              onValueChange={(value) => {
+                if (!value) return;
+                if (value === "daily") {
+                  setForm((prev) => ({ ...prev, frequency: { kind: "daily" } }));
+                } else if (value === "weekdays") {
+                  setForm((prev) => ({
+                    ...prev,
+                    frequency: {
+                      kind: "weekdays",
+                      days:
+                        prev.frequency.kind === "weekdays"
+                          ? prev.frequency.days
+                          : [1, 2, 3, 4, 5],
+                    },
+                  }));
+                } else {
+                  setForm((prev) => ({
+                    ...prev,
+                    frequency: {
+                      kind: "weekly",
+                      times:
+                        prev.frequency.kind === "weekly"
+                          ? prev.frequency.times
+                          : 3,
+                    },
+                  }));
+                }
+              }}
+              className="flex-wrap justify-start"
+            >
+              <ToggleGroupItem value="daily">Every day</ToggleGroupItem>
+              <ToggleGroupItem value="weekdays">Specific days</ToggleGroupItem>
+              <ToggleGroupItem value="weekly">Times per week</ToggleGroupItem>
+            </ToggleGroup>
+
+            {form.frequency.kind === "weekdays" && (
+              <ToggleGroup
+                type="multiple"
+                variant="outline"
+                size="sm"
+                value={form.frequency.days.map(String)}
+                onValueChange={(values) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    frequency: {
+                      kind: "weekdays",
+                      days: values
+                        .map(Number)
+                        .sort((a, b) => a - b),
+                    },
+                  }))
+                }
+                className="flex-wrap justify-start"
+              >
+                {WEEKDAY_CHIPS.map((chip) => (
+                  <ToggleGroupItem
+                    key={chip.value}
+                    value={String(chip.value)}
+                  >
+                    {chip.label}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            )}
+
+            {form.frequency.kind === "weekly" && (
+              <Select
+                value={String(form.frequency.times)}
+                onValueChange={(value) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    frequency: { kind: "weekly", times: Number(value) },
+                  }))
+                }
+              >
+                <SelectTrigger className="w-full" aria-label="Times per week">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                    <SelectItem key={n} value={String(n)}>
+                      {n} {n === 1 ? "time" : "times"} per week
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="habit-target">Daily target (optional)</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="habit-target"
+                type="number"
+                min={1}
+                inputMode="numeric"
+                placeholder="20"
+                className="w-24"
+                value={form.metric?.target ?? ""}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (!raw) {
+                    setForm((prev) => ({ ...prev, metric: null }));
+                    return;
+                  }
+                  const target = Math.max(1, Math.round(Number(raw) || 0));
+                  setForm((prev) => ({
+                    ...prev,
+                    metric: { target, unit: prev.metric?.unit ?? "" },
+                  }));
+                }}
+              />
+              <Input
+                aria-label="Target unit"
+                placeholder="pages, km, minutes…"
+                disabled={!form.metric}
+                value={form.metric?.unit ?? ""}
+                onChange={(e) =>
+                  setForm((prev) =>
+                    prev.metric
+                      ? { ...prev, metric: { ...prev.metric, unit: e.target.value } }
+                      : prev,
+                  )
+                }
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Track an amount (e.g. 20 pages). Leave blank for a simple done /
+              not-done habit.
+            </p>
+          </div>
+
+          <div className="grid gap-2">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="habit-remind"
+                checked={form.remindTime !== null}
+                onCheckedChange={(checked) =>
+                  setForm({
+                    ...form,
+                    remindTime:
+                      checked === true ? form.startTime ?? "09:00" : null,
+                  })
+                }
+              />
+              <Label htmlFor="habit-remind" className="font-normal">
+                Remind me at a time
+              </Label>
+            </div>
+            {form.remindTime !== null && (
+              <div className="flex items-center gap-2">
+                <TimeField
+                  id="habit-remind-time"
+                  value={form.remindTime}
+                  onChange={(value) =>
+                    setForm((prev) => ({ ...prev, remindTime: value }))
+                  }
+                  className="w-40"
+                />
+                <Select
+                  value={String(form.remindLead ?? 0)}
+                  onValueChange={(value) =>
+                    setForm({ ...form, remindLead: Number(value) })
+                  }
+                >
+                  <SelectTrigger className="w-full" aria-label="Reminder lead">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {REMIND_LEAD_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              A cue fires at this time on days the habit is due.
             </p>
           </div>
 

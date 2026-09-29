@@ -19,7 +19,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
+import { amountFor, frequencyLabel, weeklyQuotaProgress } from "@/lib/cadence";
 import { today } from "@/lib/date";
+import { identityForHabit } from "@/lib/identity";
 import { windowLabel, habitWindowFor } from "@/lib/schedule";
 import { isActive } from "@/lib/stats";
 import { cn } from "@/lib/utils";
@@ -28,17 +32,23 @@ import type {
   Habit,
   HabitLogs,
   HabitStats,
+  Identity,
+  ProgressLog,
   TimeTable,
 } from "@/types";
 
 interface HabitDetailDialogProps {
   habit: Habit;
   category?: Category;
+  identities?: Identity[];
+  anchorHabit?: Habit;
   stats?: HabitStats;
   logs: HabitLogs;
+  progress?: ProgressLog;
   timetables: TimeTable[];
   onToggleTodo: (habitId: string, todoId: string) => void;
   onToggleToday: () => void;
+  onSetProgress?: (habitId: string, date: string, amount: number) => void;
   onEdit: () => void;
   onClose: () => void;
 }
@@ -46,11 +56,15 @@ interface HabitDetailDialogProps {
 export default function HabitDetailDialog({
   habit,
   category,
+  identities = [],
+  anchorHabit,
   stats,
   logs,
+  progress,
   timetables,
   onToggleTodo,
   onToggleToday,
+  onSetProgress,
   onEdit,
   onClose,
 }: HabitDetailDialogProps) {
@@ -59,6 +73,12 @@ export default function HabitDetailDialog({
   const done = Boolean(logs[habit.id]?.[t]);
   const window = habitWindowFor(t, habit, timetables);
   const todoDone = habit.todos.filter((todo) => todo.done).length;
+  const identity = identityForHabit(identities, habit);
+  const amount = amountFor(progress, habit.id, t);
+  const metricPct = habit.metric
+    ? Math.min(100, Math.round((amount / habit.metric.target) * 100))
+    : 0;
+  const quota = weeklyQuotaProgress(habit, logs, t);
 
   return (
     <Dialog
@@ -73,6 +93,17 @@ export default function HabitDetailDialog({
           <DialogDescription asChild>
             <div className="flex flex-wrap items-center gap-1.5">
               {category && <CategoryBadge category={category} />}
+              {identity && (
+                <Badge
+                  variant="outline"
+                  style={{
+                    borderColor: `color-mix(in oklch, ${identity.color} 40%, transparent)`,
+                    color: identity.color,
+                  }}
+                >
+                  {identity.emoji} I am becoming {identity.statement}
+                </Badge>
+              )}
               {window && (
                 <Badge
                   variant="outline"
@@ -85,6 +116,11 @@ export default function HabitDetailDialog({
               <Badge variant="outline" className="text-muted-foreground">
                 {habit.end ? `Until ${habit.end}` : "Lifetime"}
               </Badge>
+              {habit.frequency.kind !== "daily" && (
+                <Badge variant="outline" className="text-muted-foreground">
+                  {frequencyLabel(habit.frequency)}
+                </Badge>
+              )}
               {stats && (
                 <>
                   <Badge
@@ -114,12 +150,83 @@ export default function HabitDetailDialog({
         </DialogHeader>
 
         <div className="space-y-5">
+          {(habit.anchorHabitId || habit.anchorText) && (
+            <p className="rounded-lg bg-muted/40 px-3 py-2 text-sm">
+              <span className="text-muted-foreground">After </span>
+              <strong className="font-medium">
+                {habit.anchorText?.trim() || anchorHabit?.name || "an existing habit"}
+              </strong>
+              <span className="text-muted-foreground">, I will </span>
+              <strong className="font-medium">{habit.name}</strong>.
+            </p>
+          )}
+
           {habit.description && (
             <section className="space-y-1.5">
               <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                 Description
               </h3>
               <p className="text-sm whitespace-pre-wrap">{habit.description}</p>
+            </section>
+          )}
+
+          {(habit.metric || habit.frequency.kind === "weekly") && (
+            <section className="space-y-3">
+              <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                Progress
+              </h3>
+              {habit.metric && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>Today</span>
+                    <span className="tabular-nums">
+                      {amount} / {habit.metric.target} {habit.metric.unit}
+                    </span>
+                  </div>
+                  <Progress
+                    value={metricPct}
+                    aria-label={`${habit.name}: ${amount} of ${habit.metric.target}`}
+                    className="h-1.5 [&>[data-slot=progress-indicator]]:bg-success"
+                  />
+                  {onSetProgress && (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={0}
+                        inputMode="numeric"
+                        className="h-8 w-24"
+                        aria-label={`Log amount for ${habit.name}`}
+                        value={amount}
+                        disabled={!active}
+                        onChange={(e) =>
+                          onSetProgress(habit.id, t, Number(e.target.value) || 0)
+                        }
+                      />
+                      <span className="text-xs text-muted-foreground">
+                        log today&apos;s amount
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+              {habit.frequency.kind === "weekly" && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>This week</span>
+                    <span className="tabular-nums">
+                      {quota.done} / {quota.target}
+                    </span>
+                  </div>
+                  <Progress
+                    value={Math.min(
+                      100,
+                      Math.round((quota.done / quota.target) * 100),
+                    )}
+                    aria-label={`${habit.name}: ${quota.done} of ${quota.target} this week`}
+                    className="h-1.5 [&>[data-slot=progress-indicator]]:bg-warning"
+                  />
+                </div>
+              )}
             </section>
           )}
 

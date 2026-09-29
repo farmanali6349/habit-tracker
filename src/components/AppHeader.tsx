@@ -1,6 +1,6 @@
 "use client";
 
-import { DownloadIcon, MenuIcon } from "lucide-react";
+import { DownloadIcon, MenuIcon, SparklesIcon } from "lucide-react";
 import { usePathname } from "next/navigation";
 import ReminderMenu from "./ReminderMenu";
 import { useApp } from "./shell/AppProvider";
@@ -14,7 +14,7 @@ interface AppHeaderProps {
 }
 
 export default function AppHeader({ onOpenNav }: AppHeaderProps) {
-  const { openExport } = useApp();
+  const { openExport, openOnboarding } = useApp();
   const pathname = usePathname();
   const current = navItemFor(pathname);
 
@@ -42,6 +42,16 @@ export default function AppHeader({ onOpenNav }: AppHeaderProps) {
 
         <div className="flex items-center gap-2">
           <ReminderMenu />
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={openOnboarding}
+            aria-label="Run setup"
+          >
+            <SparklesIcon data-icon="inline-start" />
+            <span className="hidden sm:inline">Setup</span>
+          </Button>
 
           <Button variant="outline" size="sm" onClick={openExport}>
             <DownloadIcon data-icon="inline-start" />

@@ -1,8 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { LayoutGridIcon, PlusIcon, SearchIcon } from "lucide-react";
+import { BanIcon, LayoutGridIcon, PlusIcon, SearchIcon } from "lucide-react";
+import ChainsCard from "@/components/ChainsCard";
 import HabitGroup from "@/components/HabitGroup";
+import HabitListItem from "@/components/HabitListItem";
 import { useApp } from "@/components/shell/AppProvider";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,7 +16,7 @@ import {
 } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { useNow } from "@/hooks/useNow";
-import { groupHabitsByCategory } from "@/lib/categories";
+import { groupHabitsByCategory, uncategorizedCategory } from "@/lib/categories";
 import { today } from "@/lib/date";
 import { compareByMoment, resolveHabitMoments } from "@/lib/schedule";
 import type { Habit, HabitMomentInfo } from "@/types";
@@ -22,11 +24,16 @@ import type { Habit, HabitMomentInfo } from "@/types";
 export default function HabitsSection() {
   const { state, derived, toggleLog, deleteHabit, openHabitForm, openHabitDetail } =
     useApp();
-  const { habits, categories, logs, timetables } = state;
+  const { habits, categories, logs, timetables, identities } = state;
   const { stats } = derived;
   const [query, setQuery] = useState("");
   const t = today();
   const now = useNow();
+
+  const habitNames = useMemo(
+    () => Object.fromEntries(habits.map((habit) => [habit.id, habit.name])),
+    [habits],
+  );
 
   const moments = useMemo(() => {
     const map = new Map<string, HabitMomentInfo>();
@@ -43,7 +50,7 @@ export default function HabitsSection() {
     return map;
   }, [t, habits, logs, timetables, now.minutes]);
 
-  const groups = useMemo(() => {
+  const { groups, limitHabits } = useMemo(() => {
     const q = query.trim().toLowerCase();
     const visible = q
       ? habits.filter((h) => h.name.toLowerCase().includes(q))
@@ -59,11 +66,24 @@ export default function HabitsSection() {
       return a.name.localeCompare(b.name);
     };
 
-    return groupHabitsByCategory(visible, categories).map((group) => ({
-      ...group,
-      habits: [...group.habits].sort(order),
-    }));
+    const build = visible.filter((habit) => habit.kind !== "limit");
+    const limit = visible
+      .filter((habit) => habit.kind === "limit")
+      .sort(order);
+
+    return {
+      groups: groupHabitsByCategory(build, categories).map((group) => ({
+        ...group,
+        habits: [...group.habits].sort(order),
+      })),
+      limitHabits: limit,
+    };
   }, [habits, categories, query, moments]);
+
+  const categoryById = useMemo(
+    () => new Map(categories.map((category) => [category.id, category])),
+    [categories],
+  );
 
   return (
     <div className="space-y-4">
@@ -90,13 +110,48 @@ export default function HabitsSection() {
         Select a day to backfill.
       </p>
 
-      {groups.length ? (
+      {!query.trim() && <ChainsCard habits={habits} />}
+
+      {limitHabits.length > 0 && (
+        <section className="overflow-hidden rounded-xl border">
+          <div className="flex items-center gap-3 px-3 py-2.5">
+            <BanIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+            <span className="font-heading text-sm font-medium">Reduce</span>
+            <span className="text-xs text-muted-foreground">
+              a check-in means you resisted
+            </span>
+          </div>
+          <div className="divide-y border-t">
+            {limitHabits.map((habit) => (
+              <HabitListItem
+                key={habit.id}
+                habit={habit}
+                category={categoryById.get(habit.categoryId) ?? uncategorizedCategory()}
+                identity={identities.find((i) => i.id === habit.identityId)}
+                anchorName={habit.anchorHabitId ? habitNames[habit.anchorHabitId] : undefined}
+                logs={logs}
+                stats={stats[habit.id]}
+                info={moments.get(habit.id)}
+                nowMinutes={now.minutes}
+                onToggle={toggleLog}
+                onEdit={(h) => openHabitForm(h)}
+                onView={openHabitDetail}
+                onDelete={deleteHabit}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {groups.length || limitHabits.length ? (
         <div className="space-y-3">
           {groups.map((group) => (
             <HabitGroup
               key={group.category.id}
               category={group.category}
               habits={group.habits}
+              identities={identities}
+              habitNames={habitNames}
               logs={logs}
               stats={stats}
               moments={moments}

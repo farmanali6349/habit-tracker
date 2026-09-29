@@ -8,11 +8,12 @@ import type {
   DayState,
   Habit,
   HabitLogs,
+  SkipLog,
   SleepLog,
 } from "@/types";
+import { isScheduled, isSkipped } from "./cadence";
 import { addDays, pad2, today } from "./date";
 import { cycleStats } from "./day";
-import { isActive } from "./stats";
 
 export const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
@@ -27,8 +28,11 @@ export const dayFacts = (
   date: string,
   habits: Habit[],
   logs: HabitLogs,
+  skips?: SkipLog,
 ): DayFacts => {
-  const active = habits.filter((h) => isActive(h, date));
+  const active = habits.filter(
+    (h) => isScheduled(h, date) && !isSkipped(skips, h.id, date),
+  );
   const done = active.filter((h) => Boolean(logs[h.id]?.[date])).length;
   const activeCount = active.length;
   const pct = activeCount ? Math.round((done / activeCount) * 100) : 0;
@@ -62,6 +66,7 @@ export const buildMonthGrid = (
   monthStart: string,
   habits: Habit[],
   logs: HabitLogs,
+  skips?: SkipLog,
 ): CalendarDay[] => {
   const firstWeekday = new Date(`${monthStart}T00:00:00`).getDay();
   const gridStart = addDays(monthStart, -firstWeekday);
@@ -70,7 +75,7 @@ export const buildMonthGrid = (
 
   return Array.from({ length: 42 }, (_, index) => {
     const date = addDays(gridStart, index);
-    const facts = dayFacts(date, habits, logs);
+    const facts = dayFacts(date, habits, logs, skips);
     return {
       date,
       day: Number(date.slice(8, 10)),
@@ -120,15 +125,16 @@ export const buildMonthSummary = (days: CalendarDay[]): CalendarSummary => {
 export const currentPerfectStreak = (
   habits: Habit[],
   logs: HabitLogs,
+  skips?: SkipLog,
 ): number => {
   let cursor = today();
-  if (dayFacts(cursor, habits, logs).state !== "complete") {
+  if (dayFacts(cursor, habits, logs, skips).state !== "complete") {
     cursor = addDays(cursor, -1);
   }
 
   let streak = 0;
   for (let guard = 0; guard < 3650; guard += 1) {
-    if (dayFacts(cursor, habits, logs).state !== "complete") break;
+    if (dayFacts(cursor, habits, logs, skips).state !== "complete") break;
     streak += 1;
     cursor = addDays(cursor, -1);
   }
@@ -140,8 +146,9 @@ const sideOf = (
   habits: Habit[],
   logs: HabitLogs,
   sleep: SleepLog,
+  skips?: SkipLog,
 ): CompareSide => {
-  const facts = dayFacts(date, habits, logs);
+  const facts = dayFacts(date, habits, logs, skips);
   const stats = cycleStats(sleep[date]);
   return {
     date,
@@ -160,14 +167,15 @@ export const compareDays = (
   categories: Category[],
   logs: HabitLogs,
   sleep: SleepLog,
+  skips?: SkipLog,
 ): DayComparison => {
   const categoryById = new Map(categories.map((c) => [c.id, c]));
 
   const rows: CompareRow[] = habits
-    .filter((habit) => isActive(habit, dateA) || isActive(habit, dateB))
+    .filter((habit) => isScheduled(habit, dateA) || isScheduled(habit, dateB))
     .map((habit) => {
-      const activeA = isActive(habit, dateA);
-      const activeB = isActive(habit, dateB);
+      const activeA = isScheduled(habit, dateA);
+      const activeB = isScheduled(habit, dateB);
       return {
         habit,
         category: categoryById.get(habit.categoryId),
@@ -183,8 +191,8 @@ export const compareDays = (
     });
 
   return {
-    a: sideOf(dateA, habits, logs, sleep),
-    b: sideOf(dateB, habits, logs, sleep),
+    a: sideOf(dateA, habits, logs, sleep, skips),
+    b: sideOf(dateB, habits, logs, sleep, skips),
     rows,
     differing: rows.filter((row) => row.doneA !== row.doneB).length,
   };

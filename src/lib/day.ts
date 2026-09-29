@@ -5,11 +5,12 @@ import type {
   MissedEntry,
   MissedLog,
   PlanComparison,
+  SkipLog,
   SleepEntry,
   TimelineEntry,
 } from "@/types";
+import { isScheduled, isSkipped } from "./cadence";
 import { dateStr, pad2, today } from "./date";
-import { isActive } from "./stats";
 
 export const MINUTES_PER_DAY = 1440;
 
@@ -212,11 +213,14 @@ export const buildDayAudit = (
   logs: HabitLogs,
   sleep: SleepEntry | undefined,
   missed: MissedLog = {},
+  skips?: SkipLog,
 ): DayAudit => {
   const t = today();
   const isPast = date < t;
   const categoryById = new Map(categories.map((c) => [c.id, c]));
-  const activeHabits = habits.filter((h) => isActive(h, date));
+  const activeHabits = habits.filter(
+    (h) => isScheduled(h, date) && !isSkipped(skips, h.id, date),
+  );
 
   const checked: TimelineEntry[] = [];
   const unresolved: TimelineEntry[] = [];

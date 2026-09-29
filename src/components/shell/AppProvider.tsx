@@ -13,7 +13,9 @@ import AppSkeleton from "@/components/AppSkeleton";
 import ExportDialog from "@/components/ExportDialog";
 import HabitDetailDialog from "@/components/HabitDetailDialog";
 import HabitFormDialog from "@/components/HabitFormDialog";
+import OnboardingDialog from "@/components/OnboardingDialog";
 import { useDerivedData, type DerivedData } from "@/hooks/useDerivedData";
+import { useHabitReminders } from "@/hooks/useHabitReminders";
 import { useHabitStore } from "@/hooks/useHabitStore";
 import { useReminders } from "@/hooks/useReminders";
 import { useTimetableReminders } from "@/hooks/useTimetableReminders";
@@ -35,6 +37,15 @@ export interface AppContextValue {
   toggleHabitTodo: Store["toggleHabitTodo"];
   saveCategory: Store["saveCategory"];
   deleteCategory: Store["deleteCategory"];
+  saveIdentity: Store["saveIdentity"];
+  deleteIdentity: Store["deleteIdentity"];
+  saveReview: Store["saveReview"];
+  deleteReview: Store["deleteReview"];
+  setProfile: Store["setProfile"];
+  setOnboarded: Store["setOnboarded"];
+  setProgress: Store["setProgress"];
+  skipHabit: Store["skipHabit"];
+  unskipHabit: Store["unskipHabit"];
   setSleep: Store["setSleep"];
   saveTimetable: Store["saveTimetable"];
   deleteTimetable: Store["deleteTimetable"];
@@ -53,6 +64,7 @@ export interface AppContextValue {
   openHabitForm: (habit: Habit | "new") => void;
   openHabitDetail: (habit: Habit) => void;
   openExport: () => void;
+  openOnboarding: () => void;
   clearAll: () => void;
 }
 
@@ -73,11 +85,13 @@ export default function AppProvider({ children }: { children: React.ReactNode })
   const [editing, setEditing] = useState<Habit | "new" | null>(null);
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [showExport, setShowExport] = useState(false);
+  const [manualOnboarding, setManualOnboarding] = useState(false);
 
   const derived = useDerivedData(
     state?.habits ?? [],
     state?.logs ?? {},
     state?.notes ?? [],
+    state?.skips ?? {},
   );
 
   const { toggleRemind } = useReminders({
@@ -98,6 +112,17 @@ export default function AppProvider({ children }: { children: React.ReactNode })
     timetables: state?.timetables ?? [],
     habits: state?.habits ?? [],
     logs: state?.logs ?? {},
+    onToggleLog: store.toggleLog,
+  });
+
+  useHabitReminders({
+    enabled: state?.remind ?? false,
+    defaultLead: state?.remindLead ?? 5,
+    sound: state?.remindSound ?? true,
+    tone: state?.remindTone ?? "chime",
+    habits: state?.habits ?? [],
+    logs: state?.logs ?? {},
+    skips: state?.skips ?? {},
     onToggleLog: store.toggleLog,
   });
 
@@ -123,6 +148,9 @@ export default function AppProvider({ children }: { children: React.ReactNode })
   const closeHabitDetail = useCallback(() => setViewingId(null), []);
 
   const openExport = useCallback(() => setShowExport(true), []);
+
+  const openOnboarding = useCallback(() => setManualOnboarding(true), []);
+  const closeOnboarding = useCallback(() => setManualOnboarding(false), []);
 
   const clearAll = useCallback(() => {
     store.clearAll();
@@ -154,6 +182,15 @@ export default function AppProvider({ children }: { children: React.ReactNode })
       toggleHabitTodo: store.toggleHabitTodo,
       saveCategory: store.saveCategory,
       deleteCategory: store.deleteCategory,
+      saveIdentity: store.saveIdentity,
+      deleteIdentity: store.deleteIdentity,
+      saveReview: store.saveReview,
+      deleteReview: store.deleteReview,
+      setProfile: store.setProfile,
+      setOnboarded: store.setOnboarded,
+      setProgress: store.setProgress,
+      skipHabit: store.skipHabit,
+      unskipHabit: store.unskipHabit,
       setSleep: store.setSleep,
       saveTimetable: store.saveTimetable,
       deleteTimetable: store.deleteTimetable,
@@ -172,6 +209,7 @@ export default function AppProvider({ children }: { children: React.ReactNode })
       openHabitForm,
       openHabitDetail,
       openExport,
+      openOnboarding,
       clearAll,
     };
   }, [
@@ -182,10 +220,13 @@ export default function AppProvider({ children }: { children: React.ReactNode })
     openHabitForm,
     openHabitDetail,
     openExport,
+    openOnboarding,
     clearAll,
   ]);
 
   if (!state || !value) return <AppSkeleton />;
+
+  const showOnboarding = manualOnboarding || !state.onboarded;
 
   const viewing = viewingId
     ? state.habits.find((habit) => habit.id === viewingId) ?? null
@@ -198,6 +239,8 @@ export default function AppProvider({ children }: { children: React.ReactNode })
         <HabitFormDialog
           habit={editing === "new" ? null : editing}
           categories={state.categories}
+          identities={state.identities}
+          habits={state.habits}
           onSave={handleSaveHabit}
           onClose={() => setEditing(null)}
         />
@@ -206,11 +249,15 @@ export default function AppProvider({ children }: { children: React.ReactNode })
         <HabitDetailDialog
           habit={viewing}
           category={state.categories.find((c) => c.id === viewing.categoryId)}
+          identities={state.identities}
+          anchorHabit={state.habits.find((h) => h.id === viewing.anchorHabitId)}
           stats={derived.stats[viewing.id]}
           logs={state.logs}
+          progress={state.progress}
           timetables={state.timetables}
           onToggleTodo={store.toggleHabitTodo}
           onToggleToday={() => store.toggleLog(viewing.id, today())}
+          onSetProgress={store.setProgress}
           onEdit={() => {
             setEditing(viewing);
             setViewingId(null);
@@ -226,6 +273,7 @@ export default function AppProvider({ children }: { children: React.ReactNode })
           onClose={() => setShowExport(false)}
         />
       )}
+      {showOnboarding && <OnboardingDialog onClose={closeOnboarding} />}
     </AppContext.Provider>
   );
 }

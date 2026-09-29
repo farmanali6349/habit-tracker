@@ -2,18 +2,26 @@ import type {
   AppState,
   Category,
   Habit,
+  HabitFrequency,
+  HabitMetric,
+  HabitProfile,
   HabitResource,
   HabitTodo,
+  Identity,
   MissedEntry,
   MissedLog,
   Note,
+  ProgressLog,
+  SkipLog,
   SleepEntry,
   SleepLog,
   TimeSlot,
   TimeTable,
+  WeeklyReview,
 } from "@/types";
 import {
   CATEGORY_COLORS,
+  DEFAULT_CATEGORY_COLOR,
   DEFAULT_CATEGORY_ICON,
   UNCATEGORIZED_ID,
   uncategorizedCategory,
@@ -27,11 +35,17 @@ export const KEY = "ht_v2";
 export const defaultState = (): AppState => ({
   habits: [],
   categories: [uncategorizedCategory()],
+  identities: [],
   logs: {},
+  progress: {},
+  skips: {},
   sleep: {},
   missed: {},
   timetables: [],
   notes: [],
+  reviews: [],
+  profile: { displayName: "", partnerName: "" },
+  onboarded: false,
   remind: false,
   rt: "20:00",
   remindSound: true,
@@ -155,6 +169,139 @@ const sanitizeTimetables = (raw: unknown): TimeTable[] => {
   });
 };
 
+const sanitizeIdentities = (raw: unknown): Identity[] => {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((candidate) => {
+    if (!candidate || typeof candidate !== "object") return [];
+    const identity = candidate as Partial<Identity>;
+    if (typeof identity.statement !== "string" || !identity.statement.trim())
+      return [];
+    return [
+      {
+        id: typeof identity.id === "string" && identity.id ? identity.id : uid(),
+        statement: identity.statement.trim(),
+        emoji:
+          typeof identity.emoji === "string" && identity.emoji
+            ? identity.emoji
+            : "✨",
+        color:
+          typeof identity.color === "string" && identity.color
+            ? identity.color
+            : DEFAULT_CATEGORY_COLOR,
+        createdAt:
+          typeof identity.createdAt === "string" && identity.createdAt
+            ? identity.createdAt
+            : new Date().toISOString(),
+      },
+    ];
+  });
+};
+
+const sanitizeProgress = (raw: unknown): ProgressLog => {
+  if (!raw || typeof raw !== "object") return {};
+  const out: ProgressLog = {};
+  for (const [habitId, dates] of Object.entries(
+    raw as Record<string, Record<string, unknown>>,
+  )) {
+    if (!dates || typeof dates !== "object") continue;
+    const byDate: Record<string, number> = {};
+    for (const [date, value] of Object.entries(dates)) {
+      if (typeof value === "number" && Number.isFinite(value))
+        byDate[date] = value;
+    }
+    if (Object.keys(byDate).length) out[habitId] = byDate;
+  }
+  return out;
+};
+
+const sanitizeSkips = (raw: unknown): SkipLog => {
+  if (!raw || typeof raw !== "object") return {};
+  const out: SkipLog = {};
+  for (const [habitId, dates] of Object.entries(
+    raw as Record<string, Record<string, unknown>>,
+  )) {
+    if (!dates || typeof dates !== "object") continue;
+    const byDate: Record<string, true> = {};
+    for (const [date, value] of Object.entries(dates)) {
+      if (value) byDate[date] = true;
+    }
+    if (Object.keys(byDate).length) out[habitId] = byDate;
+  }
+  return out;
+};
+
+const sanitizeReviews = (raw: unknown): WeeklyReview[] => {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((candidate) => {
+    if (!candidate || typeof candidate !== "object") return [];
+    const review = candidate as Partial<WeeklyReview>;
+    if (typeof review.weekStart !== "string" || !review.weekStart) return [];
+    return [
+      {
+        id: typeof review.id === "string" && review.id ? review.id : uid(),
+        weekStart: review.weekStart,
+        wentWell: typeof review.wentWell === "string" ? review.wentWell : "",
+        didntWork: typeof review.didntWork === "string" ? review.didntWork : "",
+        adjust: typeof review.adjust === "string" ? review.adjust : "",
+        rating:
+          typeof review.rating === "number" &&
+          review.rating >= 1 &&
+          review.rating <= 5
+            ? Math.round(review.rating)
+            : 3,
+        ts: typeof review.ts === "string" ? review.ts : new Date().toISOString(),
+      },
+    ];
+  });
+};
+
+const sanitizeProfile = (raw: unknown): HabitProfile => {
+  const input = (raw && typeof raw === "object" ? raw : {}) as Partial<HabitProfile>;
+  return {
+    displayName: typeof input.displayName === "string" ? input.displayName : "",
+    partnerName: typeof input.partnerName === "string" ? input.partnerName : "",
+  };
+};
+
+const validFrequency = (raw: unknown): HabitFrequency | null => {
+  if (!raw || typeof raw !== "object") return null;
+  const freq = raw as { kind?: unknown; days?: unknown; times?: unknown };
+  if (freq.kind === "daily") return { kind: "daily" };
+  if (freq.kind === "weekdays") {
+    const days = Array.isArray(freq.days)
+      ? freq.days.filter(
+          (d): d is number => typeof d === "number" && d >= 0 && d <= 6,
+        )
+      : [];
+    return { kind: "weekdays", days: [...new Set(days)].sort() };
+  }
+  if (
+    freq.kind === "weekly" &&
+    typeof freq.times === "number" &&
+    freq.times >= 1 &&
+    freq.times <= 7
+  ) {
+    return { kind: "weekly", times: Math.round(freq.times) };
+  }
+  return null;
+};
+
+const validMetric = (raw: unknown): HabitMetric | null => {
+  if (!raw || typeof raw !== "object") return null;
+  const metric = raw as Partial<HabitMetric>;
+  if (
+    typeof metric.target !== "number" ||
+    !Number.isFinite(metric.target) ||
+    metric.target <= 0
+  ) {
+    return null;
+  }
+  return {
+    target: metric.target,
+    unit: typeof metric.unit === "string" ? metric.unit : "",
+  };
+};
+
 /**
  * Normalises persisted data. Adds categories if missing, converts the legacy
  * `habit.cat` string into a `categoryId`, and re-homes habits whose category no
@@ -206,6 +353,13 @@ export const migrateState = (raw: unknown): AppState | null => {
     return null;
   };
 
+  const identities = sanitizeIdentities(input.identities);
+  const identityIds = new Set(identities.map((identity) => identity.id));
+  const habitIds = new Set<string>();
+  for (const habit of input.habits) {
+    if (typeof habit.id === "string" && habit.id) habitIds.add(habit.id);
+  }
+
   const habits: Habit[] = input.habits.map((habit) => {
     const id = habit.id ?? uid();
     const slot = slotForHabit(id);
@@ -220,6 +374,28 @@ export const migrateState = (raw: unknown): AppState | null => {
         typeof habit.description === "string" ? habit.description : "",
       todos: sanitizeTodos(habit.todos),
       resources: sanitizeResources(habit.resources),
+      identityId:
+        typeof habit.identityId === "string" && identityIds.has(habit.identityId)
+          ? habit.identityId
+          : null,
+      kind: habit.kind === "limit" ? ("limit" as const) : ("build" as const),
+      frequency: validFrequency(habit.frequency) ?? { kind: "daily" as const },
+      metric: validMetric(habit.metric),
+      anchorHabitId:
+        typeof habit.anchorHabitId === "string" &&
+        habit.anchorHabitId !== id &&
+        habitIds.has(habit.anchorHabitId)
+          ? habit.anchorHabitId
+          : null,
+      anchorText:
+        typeof habit.anchorText === "string" && habit.anchorText.trim()
+          ? habit.anchorText.trim()
+          : null,
+      remindTime: validTime(habit.remindTime),
+      remindLead:
+        typeof habit.remindLead === "number" && habit.remindLead >= 0
+          ? habit.remindLead
+          : null,
     };
 
     if (!habit.categoryId && typeof habit.cat === "string" && habit.cat.trim()) {
@@ -239,11 +415,17 @@ export const migrateState = (raw: unknown): AppState | null => {
   return {
     habits,
     categories,
+    identities,
     logs: input.logs ?? {},
+    progress: sanitizeProgress(input.progress),
+    skips: sanitizeSkips(input.skips),
     sleep: sanitizeSleep(input.sleep),
     missed: sanitizeMissed(input.missed),
     timetables,
     notes,
+    reviews: sanitizeReviews(input.reviews),
+    profile: sanitizeProfile(input.profile),
+    onboarded: Boolean(input.onboarded) || habits.length > 0,
     remind: Boolean(input.remind),
     rt: typeof input.rt === "string" ? input.rt : "20:00",
     remindSound: input.remindSound === undefined ? true : Boolean(input.remindSound),

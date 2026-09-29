@@ -56,7 +56,7 @@ const HEATMAP_CAP = 182;
 
 export default function AnalyticsSection() {
   const { state, derived } = useApp();
-  const { habits, categories, logs, sleep, timetables, missed } = state;
+  const { habits, categories, logs, sleep, timetables, missed, skips } = state;
   const { stats, badges } = derived;
 
   const [periodValue, setPeriodValue] = useState<string>("30");
@@ -71,44 +71,45 @@ export default function AnalyticsSection() {
     return {
       t,
       span,
-      ranked: rankRange(habits, logs, from, t).sort((a, b) => b.p - a.p),
+      ranked: rankRange(habits, logs, from, t, skips).sort((a, b) => b.p - a.p),
       hours: hourBuckets(habits, logs, from, t),
-      weekdays: weekdayStat(habits, logs, from, t),
-      stacks: missedVsCompleted(habits, logs, from, t),
-      delta: periodDelta(habits, logs, span),
-      weeks: weeklySeries(habits, logs, 8),
-      months: monthlySeries(habits, logs, 6),
-      cats: categoryStats(habits, categories, logs, from, t).sort(
+      weekdays: weekdayStat(habits, logs, from, t, skips),
+      stacks: missedVsCompleted(habits, logs, from, t, skips),
+      delta: periodDelta(habits, logs, span, skips),
+      weeks: weeklySeries(habits, logs, 8, skips),
+      months: monthlySeries(habits, logs, 6, skips),
+      cats: categoryStats(habits, categories, logs, from, t, skips).sort(
         (a, b) => b.pct - a.pct,
       ),
       accuracy: planAccuracy(timetables, habits, categories, logs, from, t),
-      heat: heatmapData(habits, logs, Math.min(span, HEATMAP_CAP)),
-      year: yearSummary(habits, categories, logs, t.slice(0, 4)),
+      heat: heatmapData(habits, logs, Math.min(span, HEATMAP_CAP), skips),
+      year: yearSummary(habits, categories, logs, t.slice(0, 4), skips),
     };
-  }, [habits, categories, logs, timetables, periodValue]);
+  }, [habits, categories, logs, timetables, skips, periodValue]);
 
   const insights = useMemo(
-    () => generateInsights(habits, categories, logs, sleep, timetables),
-    [habits, categories, logs, sleep, timetables],
+    () => generateInsights(habits, categories, logs, sleep, timetables, skips),
+    [habits, categories, logs, sleep, timetables, skips],
   );
 
   const perfectStreak = useMemo(
-    () => currentPerfectStreak(habits, logs),
-    [habits, logs],
+    () => currentPerfectStreak(habits, logs, skips),
+    [habits, logs, skips],
   );
 
   const missedRollup = useMemo(
-    () => buildMissedRollup(habits, categories, logs, missed, { windowDays: 90 }),
-    [habits, categories, logs, missed],
+    () =>
+      buildMissedRollup(habits, categories, logs, missed, { windowDays: 90 }, skips),
+    [habits, categories, logs, missed, skips],
   );
 
   const trendIsYearly = view.span >= 180;
   const trendData = trendIsYearly ? view.months : view.weeks;
 
   const tiles = [
-    { label: "Daily", value: `${overallCompletion(habits, logs, 1)}%` },
-    { label: "Weekly", value: `${overallCompletion(habits, logs, 7)}%` },
-    { label: "Monthly", value: `${overallCompletion(habits, logs, 30)}%` },
+    { label: "Daily", value: `${overallCompletion(habits, logs, 1, skips)}%` },
+    { label: "Weekly", value: `${overallCompletion(habits, logs, 7, skips)}%` },
+    { label: "Monthly", value: `${overallCompletion(habits, logs, 30, skips)}%` },
     { label: "Period consistency", value: `${view.delta.current}%` },
     { label: "Perfect streak", value: `${perfectStreak}d` },
   ];

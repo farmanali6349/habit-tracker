@@ -35,10 +35,11 @@ export default function CalendarSection() {
     toggleLog,
     markMissed,
     unmarkMissed,
+    skipHabit,
     saveMissedNote,
     setSleep,
   } = useApp();
-  const { habits, categories, logs, sleep, timetables, missed } = state;
+  const { habits, categories, logs, sleep, timetables, missed, skips } = state;
   const t = today();
 
   const [monthStart, setMonthStart] = useState(() => startOfMonth(t));
@@ -46,21 +47,29 @@ export default function CalendarSection() {
   const [selection, setSelection] = useState<string[]>([t]);
 
   const days = useMemo(
-    () => buildMonthGrid(monthStart, habits, logs),
-    [monthStart, habits, logs],
+    () => buildMonthGrid(monthStart, habits, logs, skips),
+    [monthStart, habits, logs, skips],
   );
   const summary = useMemo(() => buildMonthSummary(days), [days]);
   const streak = useMemo(
-    () => currentPerfectStreak(habits, logs),
-    [habits, logs],
+    () => currentPerfectStreak(habits, logs, skips),
+    [habits, logs, skips],
   );
 
   const comparison = useMemo(
     () =>
       mode === "compare" && selection.length === 2
-        ? compareDays(selection[0], selection[1], habits, categories, logs, sleep)
+        ? compareDays(
+            selection[0],
+            selection[1],
+            habits,
+            categories,
+            logs,
+            sleep,
+            skips,
+          )
         : null,
-    [mode, selection, habits, categories, logs, sleep],
+    [mode, selection, habits, categories, logs, sleep, skips],
   );
 
   const handleSelect = (date: string) => {
@@ -193,11 +202,13 @@ export default function CalendarSection() {
           categories={categories}
           logs={logs}
           missed={missed}
+          skips={skips}
           sleep={sleep[selection[0] ?? t]}
           timetables={timetables}
           onToggle={toggleLog}
           onMarkMissed={markMissed}
           onUnmarkMissed={unmarkMissed}
+          onSkip={skipHabit}
           onSaveMissedNote={saveMissedNote}
           onSetSleep={setSleep}
         />

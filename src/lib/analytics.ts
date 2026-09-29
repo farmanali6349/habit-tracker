@@ -9,16 +9,17 @@ import type {
   PlanAccuracy,
   PeriodDelta,
   RankRow,
+  SkipLog,
   TimeTable,
   TrendPoint,
   WeekdayStat,
   YearSummary,
 } from "@/types";
+import { isScheduled, isSkipped } from "./cadence";
 import { WEEKDAYS } from "./calendar";
 import { groupHabitsByCategory } from "./categories";
 import { addDays, diffDays, pad2, today } from "./date";
 import { formatHour, logTimeForDate } from "./day";
-import { isActive } from "./stats";
 import { buildPlanComparison } from "./timetable";
 
 interface Counts {
@@ -31,12 +32,13 @@ const countsInRange = (
   logs: HabitLogs,
   from: string,
   to: string,
+  skips?: SkipLog,
 ): Counts => {
   let done = 0;
   let active = 0;
   for (let d = from; d <= to; d = addDays(d, 1)) {
     for (const habit of habits) {
-      if (!isActive(habit, d)) continue;
+      if (!isScheduled(habit, d) || isSkipped(skips, habit.id, d)) continue;
       active += 1;
       if (logs[habit.id]?.[d]) done += 1;
     }
@@ -53,13 +55,14 @@ export const rankRange = (
   logs: HabitLogs,
   from: string,
   to: string,
+  skips?: SkipLog,
 ): RankRow[] =>
   habits
     .map((habit) => {
       let active = 0;
       let done = 0;
       for (let d = from; d <= to; d = addDays(d, 1)) {
-        if (!isActive(habit, d)) continue;
+        if (!isScheduled(habit, d) || isSkipped(skips, habit.id, d)) continue;
         active += 1;
         if (logs[habit.id]?.[d]) done += 1;
       }
@@ -100,13 +103,14 @@ export const weekdayStat = (
   logs: HabitLogs,
   from: string,
   to: string,
+  skips?: SkipLog,
 ): WeekdayStat[] => {
   const done = Array.from({ length: 7 }, () => 0);
   const active = Array.from({ length: 7 }, () => 0);
   for (let d = from; d <= to; d = addDays(d, 1)) {
     const weekday = new Date(`${d}T00:00:00`).getDay();
     for (const habit of habits) {
-      if (!isActive(habit, d)) continue;
+      if (!isScheduled(habit, d) || isSkipped(skips, habit.id, d)) continue;
       active[weekday] += 1;
       if (logs[habit.id]?.[d]) done[weekday] += 1;
     }
@@ -126,11 +130,14 @@ export const missedVsCompleted = (
   logs: HabitLogs,
   from: string,
   to: string,
+  skips?: SkipLog,
 ): DayStack[] => {
   const t = today();
   const out: DayStack[] = [];
   for (let d = from; d <= to; d = addDays(d, 1)) {
-    const active = habits.filter((habit) => isActive(habit, d));
+    const active = habits.filter(
+      (habit) => isScheduled(habit, d) && !isSkipped(skips, habit.id, d),
+    );
     const done = active.filter((habit) => Boolean(logs[habit.id]?.[d])).length;
     out.push({
       d,
@@ -147,13 +154,14 @@ export const periodDelta = (
   habits: Habit[],
   logs: HabitLogs,
   days: number,
+  skips?: SkipLog,
 ): PeriodDelta => {
   const t = today();
   const current = pctOf(
-    countsInRange(habits, logs, addDays(t, -(days - 1)), t),
+    countsInRange(habits, logs, addDays(t, -(days - 1)), t, skips),
   );
   const previous = pctOf(
-    countsInRange(habits, logs, addDays(t, -(days * 2 - 1)), addDays(t, -days)),
+    countsInRange(habits, logs, addDays(t, -(days * 2 - 1)), addDays(t, -days), skips),
   );
   return { current, previous, delta: current - previous };
 };
@@ -162,13 +170,14 @@ export const weeklySeries = (
   habits: Habit[],
   logs: HabitLogs,
   weeks: number,
+  skips?: SkipLog,
 ): TrendPoint[] => {
   const t = today();
   return Array.from({ length: weeks }, (_, index) => {
     const from = addDays(t, -7 * (weeks - index) + 1);
     const to = addDays(from, 6);
     const end = to > t ? t : to;
-    const counts = countsInRange(habits, logs, from, end);
+    const counts = countsInRange(habits, logs, from, end, skips);
     return {
       key: from,
       label: from.slice(5),
@@ -183,6 +192,7 @@ export const monthlySeries = (
   habits: Habit[],
   logs: HabitLogs,
   months: number,
+  skips?: SkipLog,
 ): TrendPoint[] => {
   const t = today();
   const [year, month] = t.split("-").map(Number);
@@ -193,7 +203,7 @@ export const monthlySeries = (
     const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
     const rawTo = `${key}-${pad2(lastDay.getDate())}`;
     const to = rawTo > t ? t : rawTo;
-    const counts = from > t ? { done: 0, active: 0 } : countsInRange(habits, logs, from, to);
+    const counts = from > t ? { done: 0, active: 0 } : countsInRange(habits, logs, from, to, skips);
     return {
       key,
       label: date.toLocaleDateString(undefined, { month: "short" }),
@@ -210,6 +220,7 @@ export const categoryStats = (
   logs: HabitLogs,
   from: string,
   to: string,
+  skips?: SkipLog,
 ): CategoryStat[] =>
   groupHabitsByCategory(habits, categories).map((group) => {
     let done = 0;
@@ -218,7 +229,7 @@ export const categoryStats = (
     let bestPct = -1;
 
     for (const habit of group.habits) {
-      const counts = countsInRange([habit], logs, from, to);
+      const counts = countsInRange([habit], logs, from, to, skips);
       done += counts.done;
       active += counts.active;
       const pct = pctOf(counts);
@@ -315,11 +326,14 @@ export const heatmapData = (
   habits: Habit[],
   logs: HabitLogs,
   days: number,
+  skips?: SkipLog,
 ): HeatPoint[] => {
   const t = today();
   return Array.from({ length: days }, (_, index) => {
     const date = addDays(t, index - days + 1);
-    const active = habits.filter((habit) => isActive(habit, date));
+    const active = habits.filter(
+      (habit) => isScheduled(habit, date) && !isSkipped(skips, habit.id, date),
+    );
     const done = active.filter((habit) => Boolean(logs[habit.id]?.[date])).length;
     return {
       date,
@@ -336,20 +350,23 @@ export const yearSummary = (
   categories: Category[],
   logs: HabitLogs,
   year: string,
+  skips?: SkipLog,
 ): YearSummary => {
   const t = today();
   const from = `${year}-01-01`;
   const yearEnd = `${year}-12-31`;
   const to = yearEnd > t ? t : yearEnd;
 
-  const ranked = rankRange(habits, logs, from, to).sort((a, b) => b.p - a.p);
+  const ranked = rankRange(habits, logs, from, to, skips).sort((a, b) => b.p - a.p);
   const meaningful = ranked.filter((row) => row.a >= 3);
   const pool = meaningful.length ? meaningful : ranked;
 
   let bestStreak = 0;
   let run = 0;
   for (let d = from; d <= to; d = addDays(d, 1)) {
-    const activeHabits = habits.filter((habit) => isActive(habit, d));
+    const activeHabits = habits.filter(
+      (habit) => isScheduled(habit, d) && !isSkipped(skips, habit.id, d),
+    );
     const done = activeHabits.filter((habit) => Boolean(logs[habit.id]?.[d])).length;
     if (activeHabits.length && done === activeHabits.length) {
       run += 1;
@@ -364,7 +381,7 @@ export const yearSummary = (
     const key = d.slice(0, 7);
     const current = monthCounts.get(key) ?? { done: 0, active: 0 };
     for (const habit of habits) {
-      if (!isActive(habit, d)) continue;
+      if (!isScheduled(habit, d) || isSkipped(skips, habit.id, d)) continue;
       current.active += 1;
       if (logs[habit.id]?.[d]) current.done += 1;
     }
@@ -385,7 +402,7 @@ export const yearSummary = (
   const totalActiveDays = Array.from(
     { length: Math.max(0, diffDays(from, to) + 1) },
     (_, index) => addDays(from, index),
-  ).filter((d) => habits.some((habit) => isActive(habit, d))).length;
+  ).filter((d) => habits.some((habit) => isScheduled(habit, d))).length;
 
   return {
     year,
@@ -393,9 +410,9 @@ export const yearSummary = (
     weakest: [...pool].reverse().slice(0, 3),
     bestStreak,
     mostConsistentMonth,
-    categories: categoryStats(habits, categories, logs, from, to),
+    categories: categoryStats(habits, categories, logs, from, to, skips),
     totalDone: ranked.reduce((sum, row) => sum + row.c, 0),
     activeDays: totalActiveDays,
-    consistencyPct: pctOf(countsInRange(habits, logs, from, to)),
+    consistencyPct: pctOf(countsInRange(habits, logs, from, to, skips)),
   };
 };

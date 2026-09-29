@@ -6,6 +6,7 @@ import {
   ClockIcon,
   EyeIcon,
   FlameIcon,
+  LinkIcon,
   MoreHorizontalIcon,
   PencilIcon,
   TrashIcon,
@@ -35,6 +36,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import CategoryBadge from "./CategoryBadge";
+import { frequencyLabel, isScheduled, isWeeklyQuota } from "@/lib/cadence";
 import { addDays, today } from "@/lib/date";
 import { formatWindowEnd, progressPct, windowLabel } from "@/lib/schedule";
 import { isActive } from "@/lib/stats";
@@ -45,6 +47,7 @@ import type {
   HabitLogs,
   HabitMomentInfo,
   HabitStats,
+  Identity,
 } from "@/types";
 
 const STRIP_DAYS = 14;
@@ -52,6 +55,8 @@ const STRIP_DAYS = 14;
 interface HabitListItemProps {
   habit: Habit;
   category: Category;
+  identity?: Identity;
+  anchorName?: string;
   logs: HabitLogs;
   stats: HabitStats;
   /** Live window + status for today, if the habit is active. */
@@ -66,6 +71,8 @@ interface HabitListItemProps {
 export default function HabitListItem({
   habit,
   category,
+  identity,
+  anchorName,
   logs,
   stats,
   info,
@@ -85,6 +92,7 @@ export default function HabitListItem({
   const moment = info?.moment;
   const isOngoing = moment === "ongoing";
   const isOverdue = moment === "overdue";
+  const isLimit = habit.kind === "limit";
 
   return (
     <div
@@ -103,7 +111,9 @@ export default function HabitListItem({
         size="icon"
         disabled={!active}
         aria-pressed={done}
-        aria-label={`${done ? "Undo" : "Mark"} ${habit.name}`}
+        aria-label={`${
+          done ? "Undo" : isLimit ? "Mark resisted" : "Mark"
+        } ${habit.name}`}
         onClick={() => onToggle(habit.id, t)}
         className={cn(
           "size-10 shrink-0 rounded-full",
@@ -161,6 +171,17 @@ export default function HabitListItem({
 
         <div className="flex flex-wrap items-center gap-1.5">
           <CategoryBadge category={category} />
+          {identity && (
+            <Badge
+              variant="outline"
+              style={{
+                borderColor: `color-mix(in oklch, ${identity.color} 40%, transparent)`,
+                color: identity.color,
+              }}
+            >
+              {identity.emoji} {identity.statement}
+            </Badge>
+          )}
           {window && (
             <Badge
               variant="outline"
@@ -176,33 +197,49 @@ export default function HabitListItem({
             </Badge>
           )}
           {isOverdue && !done && (
-            <Badge
-              variant="outline"
-              className="border-destructive/40 text-destructive"
-            >
+            <Badge variant="outline" className="border-warning/40 text-warning">
               Overdue
             </Badge>
           )}
           <Badge variant="outline" className="text-muted-foreground">
             {habit.end ? `Until ${habit.end}` : "Lifetime"}
           </Badge>
-          <Badge variant="outline" className="border-warning/40 text-warning">
-            <FlameIcon />
-            {stats.cur}d
-          </Badge>
-          <Badge variant="outline" className="text-muted-foreground">
-            Best {stats.best}d
-          </Badge>
-          <Badge
-            variant="outline"
-            className={cn(
-              stats.pct === 100
-                ? "border-success/40 text-success"
-                : "text-muted-foreground",
-            )}
-          >
-            {stats.pct}%
-          </Badge>
+          {habit.frequency.kind !== "daily" && (
+            <Badge variant="outline" className="text-muted-foreground">
+              {frequencyLabel(habit.frequency)}
+            </Badge>
+          )}
+          {(habit.anchorHabitId || habit.anchorText) && (
+            <Badge variant="outline" className="text-muted-foreground">
+              <LinkIcon />
+              After {habit.anchorText?.trim() || anchorName || "a habit"}
+            </Badge>
+          )}
+          {isLimit ? (
+            <Badge variant="outline" className="text-muted-foreground">
+              Reduce · resist days count
+            </Badge>
+          ) : (
+            <>
+              <Badge variant="outline" className="border-warning/40 text-warning">
+                <FlameIcon />
+                {stats.cur}d
+              </Badge>
+              <Badge variant="outline" className="text-muted-foreground">
+                Best {stats.best}d
+              </Badge>
+              <Badge
+                variant="outline"
+                className={cn(
+                  stats.pct === 100
+                    ? "border-success/40 text-success"
+                    : "text-muted-foreground",
+                )}
+              >
+                {stats.pct}%
+              </Badge>
+            </>
+          )}
         </div>
 
         {isOngoing && window && (
@@ -229,7 +266,9 @@ export default function HabitListItem({
         <div className="flex items-center gap-1">
           {Array.from({ length: STRIP_DAYS }, (_, i) => {
             const d = addDays(t, i - STRIP_DAYS + 1);
-            const dayActive = isActive(habit, d);
+            const dayActive = isWeeklyQuota(habit)
+              ? isActive(habit, d)
+              : isScheduled(habit, d);
             const dayDone = Boolean(log[d]);
             const missed = dayActive && !dayDone && d < t;
             const label = `${new Date(`${d}T00:00:00`).toDateString()} — ${

@@ -7,6 +7,36 @@ export interface Category {
   color: string;
 }
 
+/** An identity the user is trying to become ("a healthy person"). */
+export interface Identity {
+  id: string;
+  /** Completes "I am becoming …", e.g. "a runner". */
+  statement: string;
+  /** Single emoji shown next to the statement. */
+  emoji: string;
+  /** One of the CATEGORY_COLORS values. */
+  color: string;
+  createdAt: string;
+}
+
+/**
+ * How often a habit is expected. `weekly` is measured per calendar week rather
+ * than per day, so a "3×/week" habit isn't penalised on its rest days.
+ */
+export type HabitFrequency =
+  | { kind: "daily" }
+  | { kind: "weekdays"; days: number[] }
+  | { kind: "weekly"; times: number };
+
+/** An optional numeric target for a habit, e.g. { target: 20, unit: "pages" }. */
+export interface HabitMetric {
+  target: number;
+  unit: string;
+}
+
+/** Build a new habit, or limit/reduce a bad one. */
+export type HabitKind = "build" | "limit";
+
 export interface HabitTodo {
   id: string;
   text: string;
@@ -35,6 +65,22 @@ export interface Habit {
   todos: HabitTodo[];
   /** Reference links (title + url) shown in the habit detail modal. */
   resources: HabitResource[];
+  /** Identity this habit casts a vote for, or null. */
+  identityId: string | null;
+  /** Whether the habit is being built or limited. */
+  kind: HabitKind;
+  /** How often the habit is expected (defaults to daily). */
+  frequency: HabitFrequency;
+  /** Optional numeric target; null means a simple done/not-done habit. */
+  metric: HabitMetric | null;
+  /** Habit this one is stacked after ("After X, I will …"), or null. */
+  anchorHabitId: string | null;
+  /** Free-text cue anchor, e.g. "After I brush my teeth". */
+  anchorText: string | null;
+  /** Per-habit reminder time ("HH:MM"), overriding the global lead, or null. */
+  remindTime: string | null;
+  /** Per-habit reminder lead in minutes, or null to use the global lead. */
+  remindLead: number | null;
 }
 
 /** A resolved window for a habit on a date, in minutes past midnight. */
@@ -61,6 +107,12 @@ export interface HabitMomentInfo {
 }
 
 export type HabitLogs = Record<string, Record<string, string>>;
+
+/** habitId → "YYYY-MM-DD" → amount logged (for habits with a numeric target). */
+export type ProgressLog = Record<string, Record<string, number>>;
+
+/** habitId → "YYYY-MM-DD" → true, for planned rest/skip days. */
+export type SkipLog = Record<string, Record<string, true>>;
 
 export interface SleepEntry {
   /** Local "HH:MM" the day started, or null when unset. */
@@ -94,14 +146,42 @@ export interface Note {
   text: string;
 }
 
+/** A saved end-of-week reflection. */
+export interface WeeklyReview {
+  id: string;
+  /** Monday of the reviewed week ("YYYY-MM-DD"). */
+  weekStart: string;
+  wentWell: string;
+  didntWork: string;
+  adjust: string;
+  /** 1–5 self rating for the week. */
+  rating: number;
+  ts: string;
+}
+
+/** Local, single-device profile + accountability partner. */
+export interface HabitProfile {
+  displayName: string;
+  partnerName: string;
+}
+
 export interface AppState {
   habits: Habit[];
   categories: Category[];
+  identities: Identity[];
   logs: HabitLogs;
+  /** habitId → date → amount logged, for habits with a numeric target. */
+  progress: ProgressLog;
+  /** habitId → date → true, for planned rest/skip days. */
+  skips: SkipLog;
   sleep: SleepLog;
   missed: MissedLog;
   timetables: TimeTable[];
   notes: Note[];
+  reviews: WeeklyReview[];
+  profile: HabitProfile;
+  /** Whether the first-run setup has been completed (or skipped). */
+  onboarded: boolean;
   remind: boolean;
   rt: string;
   /** Play a tone when a reminder fires. */
@@ -271,6 +351,10 @@ export type CalendarMode = "day" | "compare";
 export type ExportKind = "json" | "csv";
 
 export type CategoryDraft = Omit<Category, "id"> & { id?: string };
+
+export type IdentityDraft = Omit<Identity, "id" | "createdAt"> & { id?: string };
+
+export type ReviewDraft = Omit<WeeklyReview, "id" | "ts"> & { id?: string };
 
 export type HabitDraft = Omit<Habit, "id" | "start"> & {
   id?: string;

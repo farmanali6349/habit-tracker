@@ -3,14 +3,16 @@ import type {
   Habit,
   HabitLogs,
   Insight,
+  SkipLog,
   SleepLog,
   TimeTable,
 } from "@/types";
 import { categoryStats, hourBuckets, planAccuracy, rankRange } from "./analytics";
+import { isScheduled } from "./cadence";
 import { currentPerfectStreak } from "./calendar";
 import { addDays, today } from "./date";
 import { cycleStats } from "./day";
-import { habitStats, isActive } from "./stats";
+import { habitStats } from "./stats";
 
 const SLEEP_GOOD_MINUTES = 420;
 
@@ -21,6 +23,7 @@ export const generateInsights = (
   logs: HabitLogs,
   sleep: SleepLog,
   timetables: TimeTable[],
+  skips?: SkipLog,
 ): Insight[] => {
   const insights: Insight[] = [];
   const t = today();
@@ -60,7 +63,9 @@ export const generateInsights = (
     const stats = cycleStats(sleep[d]);
     if (!stats) continue;
     sleepDays += 1;
-    const active = habits.filter((habit) => isActive(habit, d));
+    const active = habits.filter(
+      (habit) => isScheduled(habit, d) && !skips?.[habit.id]?.[d],
+    );
     const done = active.filter((habit) => Boolean(logs[habit.id]?.[d])).length;
     if (stats.asleepMinutes >= SLEEP_GOOD_MINUTES) {
       hiActive += active.length;
@@ -88,7 +93,7 @@ export const generateInsights = (
     }
   }
 
-  const cats = categoryStats(habits, categories, logs, addDays(t, -29), t)
+  const cats = categoryStats(habits, categories, logs, addDays(t, -29), t, skips)
     .filter((stat) => stat.active >= 5)
     .sort((a, b) => b.pct - a.pct);
   if (cats.length >= 2) {
@@ -111,7 +116,7 @@ export const generateInsights = (
     });
   }
 
-  const streak = currentPerfectStreak(habits, logs);
+  const streak = currentPerfectStreak(habits, logs, skips);
   if (streak >= 3) {
     insights.push({
       id: "perfect-streak",
@@ -119,6 +124,25 @@ export const generateInsights = (
       icon: "🌟",
       title: `${streak}-day perfect run`,
       detail: "Every active habit completed on each of those days.",
+    });
+  }
+
+  const yesterday = addDays(t, -1);
+  const slipped = habits.find(
+    (habit) =>
+      isScheduled(habit, yesterday) &&
+      !logs[habit.id]?.[yesterday] &&
+      !skips?.[habit.id]?.[yesterday] &&
+      isScheduled(habit, t) &&
+      !logs[habit.id]?.[t],
+  );
+  if (slipped) {
+    insights.push({
+      id: "dont-miss-twice",
+      tone: "warning",
+      icon: "🔁",
+      title: `Don't miss ${slipped.name} twice`,
+      detail: "You slipped yesterday — doing it today keeps the habit alive.",
     });
   }
 
@@ -139,7 +163,7 @@ export const generateInsights = (
     });
   }
 
-  const atRisk = rankRange(habits, logs, addDays(t, -13), t)
+  const atRisk = rankRange(habits, logs, addDays(t, -13), t, skips)
     .filter((row) => row.a >= 3 && row.p < 50)
     .sort((a, b) => a.p - b.p);
   if (atRisk.length) {
@@ -153,7 +177,7 @@ export const generateInsights = (
   }
 
   const best = habits
-    .map((habit) => ({ habit, stats: habitStats(habit, logs) }))
+    .map((habit) => ({ habit, stats: habitStats(habit, logs, skips) }))
     .sort((a, b) => b.stats.cur - a.stats.cur)[0];
   if (best && best.stats.cur >= 3) {
     insights.push({
