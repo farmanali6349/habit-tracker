@@ -38,12 +38,12 @@ export default function SidebarQuickActions({
     <Button
       variant="outline"
       size={collapsed ? "icon-sm" : "sm"}
-      aria-label="Export or back up"
+      aria-label="Import or export your data"
       className={cn(!collapsed && "w-full justify-start")}
       onClick={openExport}
     >
       <DownloadIcon data-icon={collapsed ? undefined : "inline-start"} />
-      {!collapsed && "Export"}
+      {!collapsed && "Import / Export"}
     </Button>
   );
 
@@ -58,7 +58,7 @@ export default function SidebarQuickActions({
           <ReminderMenu compact />
           <Tooltip>
             <TooltipTrigger asChild>{exportButton}</TooltipTrigger>
-            <TooltipContent side="right">Export</TooltipContent>
+            <TooltipContent side="right">Import / Export</TooltipContent>
           </Tooltip>
         </>
       ) : (

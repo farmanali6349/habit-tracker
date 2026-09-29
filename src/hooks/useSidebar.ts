@@ -46,8 +46,7 @@ const setCollapsed = (value: boolean): void => {
 
 /**
  * Persisted desktop sidebar state, plus a global Ctrl/Cmd+B shortcut. `collapsed`
- * is a shared external store so the rail and anything else stay in sync; `peek`
- * is a transient hover/focus expansion handled by the caller.
+ * is a shared external store so the rail and anything else stay in sync.
  */
 export function useSidebar() {
   const isCollapsed = useSyncExternalStore(

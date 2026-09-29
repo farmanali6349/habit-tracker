@@ -314,8 +314,8 @@ Use **Activity** to jot general notes; they're merged with your check-ins into o
 day-grouped history.
 
 ### 13. Back up and restore
-Use **Export** (sidebar quick action, or the header on mobile) to open the backup
-dialog:
+Use **Import / Export** (the sidebar quick action, or the drawer's on mobile) to
+open the backup dialog:
 
 - **JSON** — a complete, self-contained snapshot; re-import it to restore
   everything;
@@ -374,8 +374,8 @@ on desktop, a slide-out drawer on mobile).
   stored a plain category name are given a matching category; a single
   `identityId` is converted to the `identityIds` array; and a default sleep goal
   is added if one is missing.
-- **Back up often.** Use **Export** for JSON/CSV. Clearing data is destructive and
-  guarded by a typed confirmation; back up first.
+- **Back up often.** Use **Import / Export** for JSON/CSV. Clearing data is
+  destructive and guarded by a typed confirmation; back up first.
 
 ---
 
@@ -439,5 +439,4 @@ src/
   dates use the shadcn calendar. The app displays **12-hour AM/PM** time
   throughout while storing 24-hour values internally.
 - The sidebar animates its width and label positions together and respects
-  **`prefers-reduced-motion`**; hovering the collapsed rail peeks it open as an
-  overlay without shifting the page.
+  **`prefers-reduced-motion`**.
