@@ -1,0 +1,169 @@
+import type {
+  Category,
+  Habit,
+  HabitLogs,
+  Insight,
+  SleepLog,
+  TimeTable,
+} from "@/types";
+import { categoryStats, hourBuckets, planAccuracy, rankRange } from "./analytics";
+import { currentPerfectStreak } from "./calendar";
+import { addDays, today } from "./date";
+import { cycleStats } from "./day";
+import { habitStats, isActive } from "./stats";
+
+const SLEEP_GOOD_MINUTES = 420;
+
+/** Threshold-based, human-readable takeaways — no machine learning involved. */
+export const generateInsights = (
+  habits: Habit[],
+  categories: Category[],
+  logs: HabitLogs,
+  sleep: SleepLog,
+  timetables: TimeTable[],
+): Insight[] => {
+  const insights: Insight[] = [];
+  const t = today();
+
+  const buckets = hourBuckets(habits, logs, addDays(t, -29), t);
+  const total = buckets.reduce((sum, bucket) => sum + bucket.count, 0);
+  if (total >= 5) {
+    const peak = buckets.reduce((best, bucket) =>
+      bucket.count > best.count ? bucket : best,
+    );
+    if (peak.count > 0) {
+      const part =
+        peak.hour < 12
+          ? "mornings"
+          : peak.hour < 17
+            ? "afternoons"
+            : peak.hour < 21
+              ? "evenings"
+              : "late nights";
+      insights.push({
+        id: "peak-time",
+        tone: "neutral",
+        icon: "⏰",
+        title: `You're most consistent in the ${part}`,
+        detail: `${peak.count} of your last ${total} check-ins land around ${peak.label}.`,
+      });
+    }
+  }
+
+  let hiDone = 0;
+  let hiActive = 0;
+  let loDone = 0;
+  let loActive = 0;
+  let sleepDays = 0;
+  for (let i = 0; i < 60; i += 1) {
+    const d = addDays(t, -i);
+    const stats = cycleStats(sleep[d]);
+    if (!stats) continue;
+    sleepDays += 1;
+    const active = habits.filter((habit) => isActive(habit, d));
+    const done = active.filter((habit) => Boolean(logs[habit.id]?.[d])).length;
+    if (stats.asleepMinutes >= SLEEP_GOOD_MINUTES) {
+      hiActive += active.length;
+      hiDone += done;
+    } else {
+      loActive += active.length;
+      loDone += done;
+    }
+  }
+  if (sleepDays >= 5 && hiActive > 0 && loActive > 0) {
+    const hi = Math.round((hiDone / hiActive) * 100);
+    const lo = Math.round((loDone / loActive) * 100);
+    const diff = hi - lo;
+    if (Math.abs(diff) >= 5) {
+      insights.push({
+        id: "sleep",
+        tone: diff > 0 ? "positive" : "warning",
+        icon: "😴",
+        title:
+          diff > 0
+            ? "Good sleep is boosting your habits"
+            : "Sleep patterns affect productivity",
+        detail: `On 7h+ sleep days you complete ${hi}% of habits, versus ${lo}% on shorter nights.`,
+      });
+    }
+  }
+
+  const cats = categoryStats(habits, categories, logs, addDays(t, -29), t)
+    .filter((stat) => stat.active >= 5)
+    .sort((a, b) => b.pct - a.pct);
+  if (cats.length >= 2) {
+    insights.push({
+      id: "top-category",
+      tone: "positive",
+      icon: "🏅",
+      title: `${cats[0].category.name} is your strongest category`,
+      detail: `${cats[0].pct}% completion across ${cats[0].habits} ${
+        cats[0].habits === 1 ? "habit" : "habits"
+      } in the last 30 days.`,
+    });
+    const weakest = cats[cats.length - 1];
+    insights.push({
+      id: "weak-category",
+      tone: "warning",
+      icon: "🧩",
+      title: `${weakest.category.name} is falling behind`,
+      detail: `Only ${weakest.pct}% completion in the last 30 days.`,
+    });
+  }
+
+  const streak = currentPerfectStreak(habits, logs);
+  if (streak >= 3) {
+    insights.push({
+      id: "perfect-streak",
+      tone: "positive",
+      icon: "🌟",
+      title: `${streak}-day perfect run`,
+      detail: "Every active habit completed on each of those days.",
+    });
+  }
+
+  const accuracy = planAccuracy(timetables, habits, categories, logs, addDays(t, -29), t);
+  if (accuracy.planned >= 5) {
+    const deviation =
+      accuracy.avgDeviation === null
+        ? ""
+        : ` Average deviation ${Math.abs(accuracy.avgDeviation)}m ${
+            accuracy.avgDeviation >= 0 ? "late" : "early"
+          }.`;
+    insights.push({
+      id: "plan-accuracy",
+      tone: accuracy.onTimePct >= 70 ? "positive" : "warning",
+      icon: "🎯",
+      title: `${accuracy.onTimePct}% of planned habits started on time`,
+      detail: `${accuracy.done}/${accuracy.planned} followed across the last 30 days.${deviation}`,
+    });
+  }
+
+  const atRisk = rankRange(habits, logs, addDays(t, -13), t)
+    .filter((row) => row.a >= 3 && row.p < 50)
+    .sort((a, b) => a.p - b.p);
+  if (atRisk.length) {
+    insights.push({
+      id: "habit-at-risk",
+      tone: "warning",
+      icon: "⚠️",
+      title: `${atRisk[0].h.name} needs attention`,
+      detail: `Completed just ${atRisk[0].p}% of the last two weeks.`,
+    });
+  }
+
+  const best = habits
+    .map((habit) => ({ habit, stats: habitStats(habit, logs) }))
+    .sort((a, b) => b.stats.cur - a.stats.cur)[0];
+  if (best && best.stats.cur >= 3) {
+    insights.push({
+      id: "top-streak",
+      tone: "positive",
+      icon: "🔥",
+      title: `${best.habit.name} is on a ${best.stats.cur}-day streak`,
+      detail: "Your longest active streak right now.",
+    });
+  }
+
+  return insights.slice(0, 6);
+};
