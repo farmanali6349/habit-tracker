@@ -6,24 +6,49 @@ import {
   FingerprintIcon,
   LayoutDashboardIcon,
   ListChecksIcon,
+  MoonIcon,
   NotebookPenIcon,
   SunriseIcon,
   TagsIcon,
 } from "lucide-react";
 import type { NavItem } from "@/types";
 
-export const NAV_ITEMS: NavItem[] = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboardIcon },
-  { href: "/habits", label: "Habits", icon: ListChecksIcon },
-  { href: "/categories", label: "Categories", icon: TagsIcon },
-  { href: "/identities", label: "Identities", icon: FingerprintIcon },
-  { href: "/calendar", label: "Calendar", icon: CalendarDaysIcon },
-  { href: "/timetable", label: "Timetable", icon: CalendarRangeIcon },
-  { href: "/audit", label: "Day audit", icon: SunriseIcon },
-  { href: "/review", label: "Weekly review", icon: ClipboardCheckIcon },
-  { href: "/analytics", label: "Analytics", icon: BarChart3Icon },
-  { href: "/activity", label: "Activity", icon: NotebookPenIcon },
+/** A labelled cluster of nav items shown together with a section heading. */
+export interface NavGroup {
+  label: string;
+  items: NavItem[];
+}
+
+export const NAV_GROUPS: NavGroup[] = [
+  {
+    label: "Track",
+    items: [
+      { href: "/", label: "Dashboard", icon: LayoutDashboardIcon },
+      { href: "/habits", label: "Habits", icon: ListChecksIcon },
+      { href: "/categories", label: "Categories", icon: TagsIcon },
+      { href: "/identities", label: "Identities", icon: FingerprintIcon },
+    ],
+  },
+  {
+    label: "Plan",
+    items: [
+      { href: "/timetable", label: "Timetable", icon: CalendarRangeIcon },
+      { href: "/sleep", label: "Sleep", icon: MoonIcon },
+      { href: "/calendar", label: "Calendar", icon: CalendarDaysIcon },
+      { href: "/audit", label: "Day audit", icon: SunriseIcon },
+    ],
+  },
+  {
+    label: "Review",
+    items: [
+      { href: "/review", label: "Weekly review", icon: ClipboardCheckIcon },
+      { href: "/analytics", label: "Analytics", icon: BarChart3Icon },
+      { href: "/activity", label: "Activity", icon: NotebookPenIcon },
+    ],
+  },
 ];
+
+export const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((group) => group.items);
 
 export const navItemFor = (pathname: string): NavItem | undefined =>
   pathname === "/"

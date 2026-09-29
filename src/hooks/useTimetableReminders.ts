@@ -44,6 +44,8 @@ interface Options {
   timetables: TimeTable[];
   habits: Habit[];
   logs: HabitLogs;
+  /** Wake-time adjustment applied to the whole day's schedule. */
+  shiftMinutes: number;
   onToggleLog: (id: string, date: string) => void;
 }
 
@@ -61,6 +63,7 @@ export function useTimetableReminders({
   timetables,
   habits,
   logs,
+  shiftMinutes,
   onToggleLog,
 }: Options) {
   useEffect(() => {
@@ -80,7 +83,7 @@ export function useTimetableReminders({
         const habit = slot.habitId ? habitById.get(slot.habitId) : undefined;
         if (!habit || !isActive(habit, t) || logs[habit.id]?.[t]) continue;
 
-        const start = slotStartMinutes(slot);
+        const start = slotStartMinutes(slot) + shiftMinutes;
         const triggers: { kind: "lead" | "start"; at: number }[] = [];
         if (lead > 0 && start - lead >= 0) {
           triggers.push({ kind: "lead", at: start - lead });
@@ -148,5 +151,5 @@ export function useTimetableReminders({
     check();
     const id = window.setInterval(check, TICK_MS);
     return () => window.clearInterval(id);
-  }, [enabled, lead, sound, tone, timetables, habits, logs, onToggleLog]);
+  }, [enabled, lead, sound, tone, timetables, habits, logs, shiftMinutes, onToggleLog]);
 }

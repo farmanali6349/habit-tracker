@@ -31,6 +31,8 @@ interface NowCardProps {
   categories: Category[];
   logs: HabitLogs;
   timetables: TimeTable[];
+  /** Wake-time adjustment applied to today's windows. */
+  shiftMinutes?: number;
   onToggle: (id: string, date: string) => void;
 }
 
@@ -45,12 +47,21 @@ export default function NowCard({
   categories,
   logs,
   timetables,
+  shiftMinutes = 0,
   onToggle,
 }: NowCardProps) {
   const t = today();
   const categoryById = new Map(categories.map((c) => [c.id, c]));
 
-  const infos = resolveHabitMoments(t, habits, logs, timetables, t, now.minutes);
+  const infos = resolveHabitMoments(
+    t,
+    habits,
+    logs,
+    timetables,
+    t,
+    now.minutes,
+    shiftMinutes,
+  );
   const ongoing = infos
     .filter((info) => info.moment === "ongoing")
     .sort(compareByMoment);

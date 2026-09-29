@@ -40,6 +40,8 @@ interface Options {
   habits: Habit[];
   logs: HabitLogs;
   skips: SkipLog;
+  /** Wake-time adjustment applied to the whole day's schedule. */
+  shiftMinutes: number;
   onToggleLog: (id: string, date: string) => void;
 }
 
@@ -56,6 +58,7 @@ export function useHabitReminders({
   habits,
   logs,
   skips,
+  shiftMinutes,
   onToggleLog,
 }: Options) {
   useEffect(() => {
@@ -77,7 +80,7 @@ export function useHabitReminders({
           continue;
         }
 
-        const at = timeToMinutes(habit.remindTime);
+        const at = timeToMinutes(habit.remindTime) + shiftMinutes;
         const lead = habit.remindLead ?? defaultLead;
         const triggers: { kind: "lead" | "start"; at: number }[] = [];
         if (lead > 0 && at - lead >= 0) {
@@ -144,5 +147,5 @@ export function useHabitReminders({
     check();
     const id = window.setInterval(check, TICK_MS);
     return () => window.clearInterval(id);
-  }, [enabled, defaultLead, sound, tone, habits, logs, skips, onToggleLog]);
+  }, [enabled, defaultLead, sound, tone, habits, logs, skips, shiftMinutes, onToggleLog]);
 }

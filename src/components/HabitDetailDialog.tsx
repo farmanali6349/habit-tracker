@@ -46,6 +46,8 @@ interface HabitDetailDialogProps {
   logs: HabitLogs;
   progress?: ProgressLog;
   timetables: TimeTable[];
+  /** Wake-time adjustment applied to today's window. */
+  shiftMinutes?: number;
   onToggleTodo: (habitId: string, todoId: string) => void;
   onToggleToday: () => void;
   onSetProgress?: (habitId: string, date: string, amount: number) => void;
@@ -62,6 +64,7 @@ export default function HabitDetailDialog({
   logs,
   progress,
   timetables,
+  shiftMinutes = 0,
   onToggleTodo,
   onToggleToday,
   onSetProgress,
@@ -71,7 +74,7 @@ export default function HabitDetailDialog({
   const t = today();
   const active = isActive(habit, t);
   const done = Boolean(logs[habit.id]?.[t]);
-  const window = habitWindowFor(t, habit, timetables);
+  const window = habitWindowFor(t, habit, timetables, shiftMinutes);
   const todoDone = habit.todos.filter((todo) => todo.done).length;
   const links = identitiesForHabit(identities, habit);
   const amount = amountFor(progress, habit.id, t);

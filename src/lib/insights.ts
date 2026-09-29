@@ -4,6 +4,7 @@ import type {
   HabitLogs,
   Insight,
   SkipLog,
+  SleepGoal,
   SleepLog,
   TimeTable,
 } from "@/types";
@@ -11,7 +12,8 @@ import { categoryStats, hourBuckets, planAccuracy, rankRange } from "./analytics
 import { isScheduled } from "./cadence";
 import { currentPerfectStreak } from "./calendar";
 import { addDays, today } from "./date";
-import { cycleStats } from "./day";
+import { cycleStats, formatTime } from "./day";
+import { sleepTrend } from "./sleep";
 import { habitStats } from "./stats";
 
 const SLEEP_GOOD_MINUTES = 420;
@@ -23,6 +25,7 @@ export const generateInsights = (
   logs: HabitLogs,
   sleep: SleepLog,
   timetables: TimeTable[],
+  sleepGoal: SleepGoal,
   skips?: SkipLog,
 ): Insight[] => {
   const insights: Insight[] = [];
@@ -93,6 +96,37 @@ export const generateInsights = (
     }
   }
 
+  const sleepStats = sleepTrend(sleepGoal, sleep, 30, t);
+  const loggedNights = sleepStats.points.filter(
+    (point) => point.wakeDelta !== null,
+  ).length;
+  if (sleepGoal.wake && loggedNights >= 5) {
+    if (sleepStats.avgWakeDelta !== null && Math.abs(sleepStats.avgWakeDelta) >= 15) {
+      const later = sleepStats.avgWakeDelta > 0;
+      insights.push({
+        id: "sleep-wake-drift",
+        tone: "warning",
+        icon: "⏰",
+        title: `You're waking ${Math.abs(sleepStats.avgWakeDelta)}m ${
+          later ? "later" : "earlier"
+        } than planned`,
+        detail: `Across ${loggedNights} logged ${loggedNights === 1 ? "night" : "nights"}, your average wake is ${
+          later ? "behind" : "ahead of"
+        } your ${formatTime(sleepGoal.wake)} ideal.`,
+      });
+    } else {
+      insights.push({
+        id: "sleep-wake-consistent",
+        tone: "positive",
+        icon: "🌅",
+        title: `Waking on schedule ${sleepStats.onTimePct}% of nights`,
+        detail: `Within 30m of your ${formatTime(sleepGoal.wake)} ideal across ${loggedNights} logged ${
+          loggedNights === 1 ? "night" : "nights"
+        }.`,
+      });
+    }
+  }
+
   const cats = categoryStats(habits, categories, logs, addDays(t, -29), t, skips)
     .filter((stat) => stat.active >= 5)
     .sort((a, b) => b.pct - a.pct);
@@ -146,7 +180,16 @@ export const generateInsights = (
     });
   }
 
-  const accuracy = planAccuracy(timetables, habits, categories, logs, addDays(t, -29), t);
+  const accuracy = planAccuracy(
+    timetables,
+    habits,
+    categories,
+    logs,
+    addDays(t, -29),
+    t,
+    sleep,
+    sleepGoal,
+  );
   if (accuracy.planned >= 5) {
     const deviation =
       accuracy.avgDeviation === null

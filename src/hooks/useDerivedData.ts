@@ -22,6 +22,8 @@ export interface DerivedData {
   active: Habit[];
   doneToday: number;
   todayPct: number;
+  /** Habits expected today that aren't checked off yet. */
+  pendingToday: number;
   topStreak: number;
 }
 
@@ -31,7 +33,7 @@ export function useDerivedData(
   notes: Note[],
   skips?: SkipLog,
 ): DerivedData {
-  const { stats, badges, active, doneToday, todayPct, topStreak } =
+  const { stats, badges, active, doneToday, todayPct, pendingToday, topStreak } =
     useMemo(() => {
       const map: Record<string, HabitStats> = Object.fromEntries(
         habits.map((habit) => [habit.id, habitStats(habit, logs, skips)]),
@@ -52,6 +54,7 @@ export function useDerivedData(
         todayPct: scheduled.length
           ? Math.round((done / scheduled.length) * 100)
           : 0,
+        pendingToday: scheduled.length - done,
         topStreak: Math.max(0, ...Object.values(map).map((s) => s.cur)),
       };
     }, [habits, logs, skips]);
@@ -61,5 +64,14 @@ export function useDerivedData(
     [habits, logs, notes],
   );
 
-  return { stats, badges, feed, active, doneToday, todayPct, topStreak };
+  return {
+    stats,
+    badges,
+    feed,
+    active,
+    doneToday,
+    todayPct,
+    pendingToday,
+    topStreak,
+  };
 }

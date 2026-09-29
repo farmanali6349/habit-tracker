@@ -14,14 +14,16 @@ import ExportDialog from "@/components/ExportDialog";
 import HabitDetailDialog from "@/components/HabitDetailDialog";
 import HabitFormDialog from "@/components/HabitFormDialog";
 import OnboardingDialog from "@/components/OnboardingDialog";
+import ProfileDialog from "@/components/ProfileDialog";
 import { useDerivedData, type DerivedData } from "@/hooks/useDerivedData";
 import { useHabitReminders } from "@/hooks/useHabitReminders";
 import { useHabitStore } from "@/hooks/useHabitStore";
 import { useReminders } from "@/hooks/useReminders";
 import { useTimetableReminders } from "@/hooks/useTimetableReminders";
 import { today } from "@/lib/date";
+import { dayShiftMinutes, DEFAULT_SLEEP_TARGET_MINUTES } from "@/lib/sleep";
 import { primeAudio } from "@/lib/sound";
-import type { AppState, Habit, HabitDraft } from "@/types";
+import type { AppState, Habit, HabitDraft, SleepGoal } from "@/types";
 
 type Store = ReturnType<typeof useHabitStore>;
 
@@ -47,6 +49,10 @@ export interface AppContextValue {
   skipHabit: Store["skipHabit"];
   unskipHabit: Store["unskipHabit"];
   setSleep: Store["setSleep"];
+  setSleepGoal: Store["setSleepGoal"];
+  sleepGoal: SleepGoal;
+  /** Wake-time adjustment (minutes) applied to today's schedule. */
+  todayShift: number;
   saveTimetable: Store["saveTimetable"];
   deleteTimetable: Store["deleteTimetable"];
   addSlots: Store["addSlots"];
@@ -65,6 +71,7 @@ export interface AppContextValue {
   openHabitDetail: (habit: Habit) => void;
   openExport: () => void;
   openOnboarding: () => void;
+  openProfile: () => void;
   clearAll: () => void;
 }
 
@@ -82,10 +89,22 @@ export default function AppProvider({ children }: { children: React.ReactNode })
   const store = useHabitStore();
   const state = store.state;
 
+  const sleepGoal = useMemo<SleepGoal>(
+    () =>
+      state?.sleepGoal ?? {
+        wake: null,
+        bed: null,
+        targetMinutes: DEFAULT_SLEEP_TARGET_MINUTES,
+      },
+    [state],
+  );
+  const todayShift = state ? dayShiftMinutes(sleepGoal, state.sleep[today()]) : 0;
+
   const [editing, setEditing] = useState<Habit | "new" | null>(null);
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [showExport, setShowExport] = useState(false);
   const [manualOnboarding, setManualOnboarding] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
 
   const derived = useDerivedData(
     state?.habits ?? [],
@@ -112,6 +131,7 @@ export default function AppProvider({ children }: { children: React.ReactNode })
     timetables: state?.timetables ?? [],
     habits: state?.habits ?? [],
     logs: state?.logs ?? {},
+    shiftMinutes: todayShift,
     onToggleLog: store.toggleLog,
   });
 
@@ -123,6 +143,7 @@ export default function AppProvider({ children }: { children: React.ReactNode })
     habits: state?.habits ?? [],
     logs: state?.logs ?? {},
     skips: state?.skips ?? {},
+    shiftMinutes: todayShift,
     onToggleLog: store.toggleLog,
   });
 
@@ -151,6 +172,9 @@ export default function AppProvider({ children }: { children: React.ReactNode })
 
   const openOnboarding = useCallback(() => setManualOnboarding(true), []);
   const closeOnboarding = useCallback(() => setManualOnboarding(false), []);
+
+  const openProfile = useCallback(() => setShowProfile(true), []);
+  const closeProfile = useCallback(() => setShowProfile(false), []);
 
   const clearAll = useCallback(() => {
     store.clearAll();
@@ -192,6 +216,9 @@ export default function AppProvider({ children }: { children: React.ReactNode })
       skipHabit: store.skipHabit,
       unskipHabit: store.unskipHabit,
       setSleep: store.setSleep,
+      setSleepGoal: store.setSleepGoal,
+      sleepGoal,
+      todayShift,
       saveTimetable: store.saveTimetable,
       deleteTimetable: store.deleteTimetable,
       addSlots: store.addSlots,
@@ -210,17 +237,21 @@ export default function AppProvider({ children }: { children: React.ReactNode })
       openHabitDetail,
       openExport,
       openOnboarding,
+      openProfile,
       clearAll,
     };
   }, [
     state,
     derived,
     store,
+    sleepGoal,
+    todayShift,
     toggleRemind,
     openHabitForm,
     openHabitDetail,
     openExport,
     openOnboarding,
+    openProfile,
     clearAll,
   ]);
 
@@ -255,6 +286,7 @@ export default function AppProvider({ children }: { children: React.ReactNode })
           logs={state.logs}
           progress={state.progress}
           timetables={state.timetables}
+          shiftMinutes={todayShift}
           onToggleTodo={store.toggleHabitTodo}
           onToggleToday={() => store.toggleLog(viewing.id, today())}
           onSetProgress={store.setProgress}
@@ -274,6 +306,7 @@ export default function AppProvider({ children }: { children: React.ReactNode })
         />
       )}
       {showOnboarding && <OnboardingDialog onClose={closeOnboarding} />}
+      {showProfile && <ProfileDialog onClose={closeProfile} />}
     </AppContext.Provider>
   );
 }

@@ -14,6 +14,7 @@ import type {
   ProgressLog,
   SkipLog,
   SleepEntry,
+  SleepGoal,
   SleepLog,
   TimeSlot,
   TimeTable,
@@ -28,6 +29,7 @@ import {
 } from "./categories";
 import { today } from "./date";
 import { uid } from "./stats";
+import { DEFAULT_SLEEP_TARGET_MINUTES } from "./sleep";
 
 export const KEY = "ht_v2";
 
@@ -40,6 +42,7 @@ export const defaultState = (): AppState => ({
   progress: {},
   skips: {},
   sleep: {},
+  sleepGoal: { wake: null, bed: null, targetMinutes: DEFAULT_SLEEP_TARGET_MINUTES },
   missed: {},
   timetables: [],
   notes: [],
@@ -276,6 +279,23 @@ const sanitizeProfile = (raw: unknown): HabitProfile => {
   };
 };
 
+const validClock = (value: unknown): string | null =>
+  typeof value === "string" && /^\d{1,2}:\d{2}$/.test(value) ? value : null;
+
+const sanitizeSleepGoal = (raw: unknown): SleepGoal => {
+  const input = (raw && typeof raw === "object" ? raw : {}) as Partial<SleepGoal>;
+  return {
+    wake: validClock(input.wake),
+    bed: validClock(input.bed),
+    targetMinutes:
+      typeof input.targetMinutes === "number" &&
+      Number.isFinite(input.targetMinutes) &&
+      input.targetMinutes > 0
+        ? Math.round(input.targetMinutes)
+        : DEFAULT_SLEEP_TARGET_MINUTES,
+  };
+};
+
 const validFrequency = (raw: unknown): HabitFrequency | null => {
   if (!raw || typeof raw !== "object") return null;
   const freq = raw as { kind?: unknown; days?: unknown; times?: unknown };
@@ -434,6 +454,7 @@ export const migrateState = (raw: unknown): AppState | null => {
     progress: sanitizeProgress(input.progress),
     skips: sanitizeSkips(input.skips),
     sleep: sanitizeSleep(input.sleep),
+    sleepGoal: sanitizeSleepGoal(input.sleepGoal),
     missed: sanitizeMissed(input.missed),
     timetables,
     notes,

@@ -19,7 +19,8 @@ export default function AuditSection() {
     saveMissedNote,
     setSleep,
   } = useApp();
-  const { habits, categories, logs, sleep, timetables, missed, skips } = state;
+  const { habits, categories, logs, sleep, timetables, missed, skips, sleepGoal } =
+    state;
   const [date, setDate] = useState(today);
   const t = today();
   const entry = sleep[date];
@@ -102,6 +103,7 @@ export default function AuditSection() {
         skips={skips}
         sleep={entry}
         timetables={timetables}
+        sleepGoal={sleepGoal}
         onToggle={toggleLog}
         onMarkMissed={markMissed}
         onUnmarkMissed={unmarkMissed}

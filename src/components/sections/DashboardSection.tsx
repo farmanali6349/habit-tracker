@@ -43,7 +43,7 @@ const greeting = (): string => {
 };
 
 export default function DashboardSection() {
-  const { state, derived, toggleLog, setSleep } = useApp();
+  const { state, derived, toggleLog, setSleep, sleepGoal, todayShift } = useApp();
   const { habits, categories, logs, sleep, timetables, missed, skips, identities } =
     state;
   const { badges, feed, active, doneToday, todayPct, topStreak } = derived;
@@ -59,8 +59,8 @@ export default function DashboardSection() {
   );
 
   const comparison = useMemo(
-    () => buildPlanComparison(t, timetables, habits, categories, logs),
-    [t, timetables, habits, categories, logs],
+    () => buildPlanComparison(t, timetables, habits, categories, logs, todayShift),
+    [t, timetables, habits, categories, logs, todayShift],
   );
 
   const strip = useMemo(
@@ -74,8 +74,17 @@ export default function DashboardSection() {
   );
 
   const insights = useMemo(
-    () => generateInsights(habits, categories, logs, sleep, timetables, skips),
-    [habits, categories, logs, sleep, timetables, skips],
+    () =>
+      generateInsights(
+        habits,
+        categories,
+        logs,
+        sleep,
+        timetables,
+        sleepGoal,
+        skips,
+      ),
+    [habits, categories, logs, sleep, timetables, sleepGoal, skips],
   );
 
   const earned = badges.filter((badge) => badge.earned).length;
@@ -115,6 +124,7 @@ export default function DashboardSection() {
         categories={categories}
         logs={logs}
         timetables={timetables}
+        shiftMinutes={todayShift}
         onToggle={toggleLog}
       />
 
@@ -135,6 +145,7 @@ export default function DashboardSection() {
           logs={logs}
           timetables={timetables}
           now={now}
+          shiftMinutes={todayShift}
           onToggle={toggleLog}
         />
         <UpcomingGoalsCard habits={habits} categories={categories} />
@@ -145,6 +156,8 @@ export default function DashboardSection() {
         markers={strip.markers}
         onChange={(patch) => setSleep(t, patch)}
         onClear={() => setSleep(t, { wake: null, bed: null })}
+        goal={sleepGoal}
+        shiftMinutes={todayShift}
       />
 
       <FollowUpsCard fromDate={addDays(t, -1)} />

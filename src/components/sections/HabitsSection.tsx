@@ -23,7 +23,7 @@ import { compareByMoment, resolveHabitMoments } from "@/lib/schedule";
 import type { Habit, HabitMomentInfo } from "@/types";
 
 export default function HabitsSection() {
-  const { state, derived, toggleLog, deleteHabit, openHabitForm, openHabitDetail } =
+  const { state, derived, toggleLog, deleteHabit, openHabitForm, openHabitDetail, todayShift } =
     useApp();
   const { habits, categories, logs, timetables, identities } = state;
   const { stats } = derived;
@@ -45,11 +45,12 @@ export default function HabitsSection() {
       timetables,
       t,
       now.minutes,
+      todayShift,
     )) {
       map.set(info.habit.id, info);
     }
     return map;
-  }, [t, habits, logs, timetables, now.minutes]);
+  }, [t, habits, logs, timetables, now.minutes, todayShift]);
 
   const { groups, limitHabits } = useMemo(() => {
     const q = query.trim().toLowerCase();

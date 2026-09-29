@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { TONES, playTone, primeAudio } from "@/lib/sound";
+import { cn } from "@/lib/utils";
 
 const LEAD_OPTIONS = [
   { value: "0", label: "At start only" },
@@ -31,7 +32,14 @@ const LEAD_OPTIONS = [
   { value: "15", label: "15 minutes before" },
 ];
 
-export default function ReminderMenu() {
+export default function ReminderMenu({
+  compact = false,
+  className,
+}: {
+  /** Icon-only trigger, for the sidebar rail. */
+  compact?: boolean;
+  className?: string;
+}) {
   const {
     state,
     toggleRemind,
@@ -49,12 +57,12 @@ export default function ReminderMenu() {
       <PopoverTrigger asChild>
         <Button
           variant="outline"
-          size="sm"
+          size={compact ? "icon-sm" : "sm"}
           aria-label="Reminder settings"
-          className="relative"
+          className={cn("relative", className)}
         >
-          <BellIcon data-icon="inline-start" />
-          <span className="hidden sm:inline">Remind</span>
+          <BellIcon data-icon={compact ? undefined : "inline-start"} />
+          {!compact && <span className="hidden sm:inline">Remind</span>}
           {remind && (
             <span
               aria-hidden

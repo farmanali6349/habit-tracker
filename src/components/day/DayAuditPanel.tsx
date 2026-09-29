@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/empty";
 import { addDays, today } from "@/lib/date";
 import { buildDayAudit, buildDayStrip, cycleStats } from "@/lib/day";
+import { dayShiftMinutes } from "@/lib/sleep";
 import { buildPlanComparison } from "@/lib/timetable";
 import type {
   Category,
@@ -28,6 +29,7 @@ import type {
   PlanEntry,
   SkipLog,
   SleepEntry,
+  SleepGoal,
   TimeTable,
 } from "@/types";
 
@@ -40,6 +42,7 @@ interface DayAuditPanelProps {
   skips: SkipLog;
   sleep: SleepEntry | undefined;
   timetables: TimeTable[];
+  sleepGoal: SleepGoal;
   onToggle: (id: string, date: string) => void;
   onMarkMissed: (id: string, date: string) => void;
   onUnmarkMissed: (id: string, date: string) => void;
@@ -61,6 +64,7 @@ export default function DayAuditPanel({
   skips,
   sleep,
   timetables,
+  sleepGoal,
   onToggle,
   onMarkMissed,
   onUnmarkMissed,
@@ -75,9 +79,11 @@ export default function DayAuditPanel({
     [date, habits, categories, logs, sleep, missed, skips],
   );
 
+  const shift = dayShiftMinutes(sleepGoal, sleep);
+
   const plan = useMemo(
-    () => buildPlanComparison(date, timetables, habits, categories, logs),
-    [date, timetables, habits, categories, logs],
+    () => buildPlanComparison(date, timetables, habits, categories, logs, shift),
+    [date, timetables, habits, categories, logs, shift],
   );
 
   const strip = useMemo(() => buildDayStrip(audit, plan), [audit, plan]);
@@ -116,6 +122,8 @@ export default function DayAuditPanel({
         onSelect={openNote}
         onChange={(patch) => onSetSleep(date, patch)}
         onClear={() => onSetSleep(date, { wake: null, bed: null })}
+        goal={sleepGoal}
+        shiftMinutes={shift}
       />
 
       <div className="grid gap-4 lg:grid-cols-3">

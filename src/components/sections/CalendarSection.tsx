@@ -39,7 +39,8 @@ export default function CalendarSection() {
     saveMissedNote,
     setSleep,
   } = useApp();
-  const { habits, categories, logs, sleep, timetables, missed, skips } = state;
+  const { habits, categories, logs, sleep, timetables, missed, skips, sleepGoal } =
+    state;
   const t = today();
 
   const [monthStart, setMonthStart] = useState(() => startOfMonth(t));
@@ -205,6 +206,7 @@ export default function CalendarSection() {
           skips={skips}
           sleep={sleep[selection[0] ?? t]}
           timetables={timetables}
+          sleepGoal={sleepGoal}
           onToggle={toggleLog}
           onMarkMissed={markMissed}
           onUnmarkMissed={unmarkMissed}

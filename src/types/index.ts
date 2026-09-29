@@ -123,6 +123,47 @@ export interface SleepEntry {
 
 export type SleepLog = Record<string, SleepEntry>;
 
+/** The ideal sleep window a day's schedule is anchored to. */
+export interface SleepGoal {
+  /** Local "HH:MM" the user aims to wake, or null when unset. */
+  wake: string | null;
+  /** Local "HH:MM" the user aims to sleep, or null when unset. */
+  bed: string | null;
+  /** Target sleep in minutes; shown against the actual and flags a mismatch. */
+  targetMinutes: number;
+}
+
+/** How one night compares to the ideal sleep window. */
+export interface SleepDeviation {
+  /** Actual wake minus ideal wake, signed minutes (positive = later). */
+  wakeDelta: number | null;
+  /** Actual bed minus ideal bed, signed minutes (positive = later). */
+  bedDelta: number | null;
+  /** Actual time asleep in minutes, or null when incompletely logged. */
+  asleepMinutes: number | null;
+  targetMinutes: number;
+  /** Asleep minus target, signed minutes (positive = more sleep). */
+  durationDelta: number | null;
+}
+
+export interface SleepTrendPoint {
+  d: string;
+  wakeDelta: number | null;
+  bedDelta: number | null;
+  asleepMinutes: number | null;
+}
+
+/** A trailing window of nightly sleep deviations. */
+export interface SleepTrend {
+  points: SleepTrendPoint[];
+  days: number;
+  avgWakeDelta: number | null;
+  avgBedDelta: number | null;
+  avgAsleep: number | null;
+  /** Nights that started within ±30m of the ideal wake time. */
+  onTimePct: number;
+}
+
 /**
  * A habit the user explicitly flagged as missed on a given day, with the reason
  * and how they intend to cover it the next day. `reason`/`plan` hold either free
@@ -175,6 +216,8 @@ export interface AppState {
   /** habitId → date → true, for planned rest/skip days. */
   skips: SkipLog;
   sleep: SleepLog;
+  /** Ideal wake/bed + target sleep the day's schedule is anchored to. */
+  sleepGoal: SleepGoal;
   missed: MissedLog;
   timetables: TimeTable[];
   notes: Note[];

@@ -58,6 +58,7 @@ import {
 import { useNow } from "@/hooks/useNow";
 import { addDays, today } from "@/lib/date";
 import { MINUTES_PER_DAY, formatDuration, minutesToTime } from "@/lib/day";
+import { dayShiftMinutes } from "@/lib/sleep";
 import {
   buildPlanComparison,
   emptySlotCount,
@@ -86,7 +87,7 @@ export default function TimetableSection() {
     updateSlot,
     deleteSlot,
   } = useApp();
-  const { habits, categories, logs, timetables } = state;
+  const { habits, categories, logs, timetables, sleep, sleepGoal } = state;
 
   const t = today();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -108,9 +109,10 @@ export default function TimetableSection() {
     [selected],
   );
   const overlapping = useMemo(() => overlappingSlotIds(slots), [slots]);
+  const dayShift = dayShiftMinutes(sleepGoal, sleep[date]);
   const comparison = useMemo(
-    () => buildPlanComparison(date, timetables, habits, categories, logs),
-    [date, timetables, habits, categories, logs],
+    () => buildPlanComparison(date, timetables, habits, categories, logs, dayShift),
+    [date, timetables, habits, categories, logs, dayShift],
   );
 
   const now = useNow();
@@ -417,6 +419,14 @@ export default function TimetableSection() {
             </Button>
           )}
         </div>
+
+        {dayShift !== 0 && (
+          <p className="text-xs text-muted-foreground">
+            Auto-adjusted {formatDuration(Math.abs(dayShift))}{" "}
+            {dayShift > 0 ? "later" : "earlier"} for the wake time logged on
+            this day. The grid above stays in ideal times.
+          </p>
+        )}
 
         <PlanVsActual comparison={comparison} />
       </div>

@@ -3,6 +3,7 @@
 import { MoonIcon, SunIcon } from "lucide-react";
 import TimeField from "../TimeField";
 import DayStrip from "./DayStrip";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,7 +14,9 @@ import {
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { cycleStats, formatDuration, type StripMarker } from "@/lib/day";
-import type { SleepEntry } from "@/types";
+import { deviationLabel, sleepDeviation } from "@/lib/sleep";
+import { cn } from "@/lib/utils";
+import type { SleepEntry, SleepGoal } from "@/types";
 
 interface SleepLoggerProps {
   sleep: SleepEntry | undefined;
@@ -21,6 +24,10 @@ interface SleepLoggerProps {
   onChange: (patch: Partial<SleepEntry>) => void;
   onClear: () => void;
   onSelect?: (habitId: string) => void;
+  /** Ideal window; when set, a deviation readout is shown. */
+  goal?: SleepGoal;
+  /** Wake-time adjustment applied to the day's schedule. */
+  shiftMinutes?: number;
 }
 
 export default function SleepLogger({
@@ -29,9 +36,12 @@ export default function SleepLogger({
   onChange,
   onClear,
   onSelect,
+  goal,
+  shiftMinutes = 0,
 }: SleepLoggerProps) {
   const stats = cycleStats(sleep);
   const hasEntry = Boolean(sleep?.wake || sleep?.bed);
+  const deviation = goal ? sleepDeviation(goal, sleep) : null;
 
   return (
     <Card>
@@ -82,6 +92,60 @@ export default function SleepLogger({
             </Button>
           )}
         </div>
+
+        {deviation && hasEntry && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {deviation.wakeDelta !== null && (
+              <Badge
+                variant="outline"
+                className={cn(
+                  "tabular-nums",
+                  Math.abs(deviation.wakeDelta) <= 30
+                    ? "border-success/40 text-success"
+                    : "border-warning/40 text-warning",
+                )}
+              >
+                Woke {deviationLabel(deviation.wakeDelta)}
+              </Badge>
+            )}
+            {deviation.bedDelta !== null && (
+              <Badge
+                variant="outline"
+                className={cn(
+                  "tabular-nums",
+                  Math.abs(deviation.bedDelta) <= 30
+                    ? "border-success/40 text-success"
+                    : "text-muted-foreground",
+                )}
+              >
+                Bed {deviationLabel(deviation.bedDelta)}
+              </Badge>
+            )}
+            {deviation.asleepMinutes !== null &&
+              deviation.durationDelta !== null && (
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "tabular-nums",
+                    deviation.durationDelta >= 0
+                      ? "border-success/40 text-success"
+                      : "border-warning/40 text-warning",
+                  )}
+                >
+                  Slept {formatDuration(deviation.asleepMinutes)} ·{" "}
+                  {deviation.durationDelta >= 0 ? "+" : "−"}
+                  {formatDuration(Math.abs(deviation.durationDelta))} vs{" "}
+                  {formatDuration(goal!.targetMinutes)}
+                </Badge>
+              )}
+            {shiftMinutes !== 0 && (
+              <Badge variant="outline" className="text-muted-foreground">
+                Day shifted {shiftMinutes > 0 ? "later" : "earlier"} by{" "}
+                {formatDuration(Math.abs(shiftMinutes))}
+              </Badge>
+            )}
+          </div>
+        )}
 
         <DayStrip
           wake={sleep?.wake ?? null}

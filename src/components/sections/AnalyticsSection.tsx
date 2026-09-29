@@ -56,7 +56,8 @@ const HEATMAP_CAP = 182;
 
 export default function AnalyticsSection() {
   const { state, derived } = useApp();
-  const { habits, categories, logs, sleep, timetables, missed, skips } = state;
+  const { habits, categories, logs, sleep, timetables, missed, skips, sleepGoal } =
+    state;
   const { stats, badges } = derived;
 
   const [periodValue, setPeriodValue] = useState<string>("30");
@@ -81,15 +82,16 @@ export default function AnalyticsSection() {
       cats: categoryStats(habits, categories, logs, from, t, skips).sort(
         (a, b) => b.pct - a.pct,
       ),
-      accuracy: planAccuracy(timetables, habits, categories, logs, from, t),
+      accuracy: planAccuracy(timetables, habits, categories, logs, from, t, sleep, sleepGoal),
       heat: heatmapData(habits, logs, Math.min(span, HEATMAP_CAP), skips),
       year: yearSummary(habits, categories, logs, t.slice(0, 4), skips),
     };
-  }, [habits, categories, logs, timetables, skips, periodValue]);
+  }, [habits, categories, logs, timetables, skips, sleep, sleepGoal, periodValue]);
 
   const insights = useMemo(
-    () => generateInsights(habits, categories, logs, sleep, timetables, skips),
-    [habits, categories, logs, sleep, timetables, skips],
+    () =>
+      generateInsights(habits, categories, logs, sleep, timetables, sleepGoal, skips),
+    [habits, categories, logs, sleep, timetables, sleepGoal, skips],
   );
 
   const perfectStreak = useMemo(

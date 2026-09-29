@@ -1,8 +1,7 @@
 "use client";
 
-import { DownloadIcon, MenuIcon, SparklesIcon } from "lucide-react";
+import { MenuIcon, SparklesIcon } from "lucide-react";
 import { usePathname } from "next/navigation";
-import ReminderMenu from "./ReminderMenu";
 import { useApp } from "./shell/AppProvider";
 import LiveClock from "./shell/LiveClock";
 import ThemeToggle from "./ThemeToggle";
@@ -14,7 +13,7 @@ interface AppHeaderProps {
 }
 
 export default function AppHeader({ onOpenNav }: AppHeaderProps) {
-  const { openExport, openOnboarding } = useApp();
+  const { openOnboarding } = useApp();
   const pathname = usePathname();
   const current = navItemFor(pathname);
 
@@ -41,8 +40,6 @@ export default function AppHeader({ onOpenNav }: AppHeaderProps) {
         </div>
 
         <div className="flex items-center gap-2">
-          <ReminderMenu />
-
           <Button
             variant="outline"
             size="sm"
@@ -51,11 +48,6 @@ export default function AppHeader({ onOpenNav }: AppHeaderProps) {
           >
             <SparklesIcon data-icon="inline-start" />
             <span className="hidden sm:inline">Setup</span>
-          </Button>
-
-          <Button variant="outline" size="sm" onClick={openExport}>
-            <DownloadIcon data-icon="inline-start" />
-            <span className="hidden sm:inline">Export</span>
           </Button>
           <ThemeToggle />
         </div>

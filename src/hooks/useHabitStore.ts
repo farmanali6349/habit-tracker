@@ -15,6 +15,7 @@ import type {
   MissedLog,
   ReviewDraft,
   SleepEntry,
+  SleepGoal,
   TimeSlotDraft,
   TimeTable,
   TimeTableDraft,
@@ -412,6 +413,10 @@ export function useHabitStore() {
     });
   }, []);
 
+  const setSleepGoal = useCallback((patch: Partial<SleepGoal>) => {
+    patchState((x) => ({ sleepGoal: { ...x.sleepGoal, ...patch } }));
+  }, []);
+
   const saveTimetable = useCallback((draft: TimeTableDraft) => {
     patchState((x) => {
       if (draft.id) {
@@ -554,6 +559,7 @@ export function useHabitStore() {
     skipHabit,
     unskipHabit,
     setSleep,
+    setSleepGoal,
     saveTimetable,
     deleteTimetable,
     addSlots,

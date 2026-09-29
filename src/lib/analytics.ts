@@ -10,6 +10,8 @@ import type {
   PeriodDelta,
   RankRow,
   SkipLog,
+  SleepGoal,
+  SleepLog,
   TimeTable,
   TrendPoint,
   WeekdayStat,
@@ -21,6 +23,7 @@ import { groupHabitsByCategory } from "./categories";
 import { addDays, diffDays, pad2, today } from "./date";
 import { formatHour, logTimeForDate } from "./day";
 import { buildPlanComparison } from "./timetable";
+import { dayShiftMinutes } from "./sleep";
 
 interface Counts {
   done: number;
@@ -256,6 +259,8 @@ export const planAccuracy = (
   logs: HabitLogs,
   from: string,
   to: string,
+  sleep?: SleepLog,
+  goal?: SleepGoal,
 ): PlanAccuracy => {
   let planned = 0;
   let done = 0;
@@ -268,12 +273,14 @@ export const planAccuracy = (
   const byDay: DayStack[] = [];
 
   for (let d = from; d <= to; d = addDays(d, 1)) {
+    const shift = goal && sleep ? dayShiftMinutes(goal, sleep[d]) : 0;
     const comparison = buildPlanComparison(
       d,
       timetables,
       habits,
       categories,
       logs,
+      shift,
     );
     planned += comparison.plannedCount;
     done += comparison.doneCount;

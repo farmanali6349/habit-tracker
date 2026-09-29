@@ -23,24 +23,32 @@ const parseTime = (value: string | null | undefined): number | null => {
 /**
  * The window a habit is scheduled for on a date: a timetable slot for that day
  * wins, otherwise the habit's own start/end time. Null means "any time".
+ * `shiftMinutes` slides the window with the day's wake-time adjustment.
  */
 export const habitWindowFor = (
   date: string,
   habit: Habit,
   timetables: TimeTable[],
+  shiftMinutes = 0,
 ): HabitWindow | null => {
+  let base: HabitWindow | null = null;
+
   const table = activeTimetableFor(date, timetables);
   const slot = table?.slots.find((candidate) => candidate.habitId === habit.id);
   if (slot) {
     const start = slotStartMinutes(slot);
     const end = slotEndMinutes(slot);
-    if (end > start) return { start, end };
+    if (end > start) base = { start, end };
   }
 
-  const start = parseTime(habit.startTime);
-  const end = parseTime(habit.endTime);
-  if (start !== null && end !== null && end > start) return { start, end };
-  return null;
+  if (!base) {
+    const start = parseTime(habit.startTime);
+    const end = parseTime(habit.endTime);
+    if (start !== null && end !== null && end > start) base = { start, end };
+  }
+
+  if (!base || shiftMinutes === 0) return base;
+  return { start: base.start + shiftMinutes, end: base.end + shiftMinutes };
 };
 
 interface MomentInput {
@@ -97,11 +105,12 @@ export const resolveHabitMoments = (
   timetables: TimeTable[],
   today: string,
   nowMinutes: number,
+  shiftMinutes = 0,
 ): HabitMomentInfo[] =>
   habits
     .filter((habit) => isActive(habit, date))
     .map((habit) => {
-      const window = habitWindowFor(date, habit, timetables);
+      const window = habitWindowFor(date, habit, timetables, shiftMinutes);
       const log = logs[habit.id]?.[date];
       return {
         habit,

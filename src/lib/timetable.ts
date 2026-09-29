@@ -17,6 +17,7 @@ import {
 } from "./day";
 import { today } from "./date";
 import { isActive } from "./stats";
+import { shiftSlot } from "./sleep";
 
 /** "00:00" as an end time means midnight at the close of the day. */
 export const DAY_END = "00:00";
@@ -152,8 +153,16 @@ export const buildPlanComparison = (
   habits: Habit[],
   categories: Category[],
   logs: HabitLogs,
+  shiftMinutes = 0,
 ): PlanComparison => {
-  const timetable = activeTimetableFor(date, timetables);
+  const active = activeTimetableFor(date, timetables);
+  const timetable =
+    active && shiftMinutes !== 0
+      ? {
+          ...active,
+          slots: active.slots.map((slot) => shiftSlot(slot, shiftMinutes)),
+        }
+      : active;
   const habitById = new Map(habits.map((habit) => [habit.id, habit]));
   const categoryById = new Map(categories.map((category) => [category.id, category]));
   const isPast = date < today();

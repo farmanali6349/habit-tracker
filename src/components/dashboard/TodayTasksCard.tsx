@@ -37,6 +37,8 @@ interface TodayTasksCardProps {
   logs: HabitLogs;
   timetables: TimeTable[];
   now: NowMoment;
+  /** Wake-time adjustment applied to today's windows. */
+  shiftMinutes?: number;
   onToggle: (id: string, date: string) => void;
 }
 
@@ -62,6 +64,7 @@ export default function TodayTasksCard({
   logs,
   timetables,
   now,
+  shiftMinutes = 0,
   onToggle,
 }: TodayTasksCardProps) {
   const t = today();
@@ -73,6 +76,7 @@ export default function TodayTasksCard({
     timetables,
     t,
     now.minutes,
+    shiftMinutes,
   ).sort(compareByMoment);
   const done = infos.filter((info) => info.moment === "done").length;
 
