@@ -23,9 +23,18 @@ import { compareByMoment, resolveHabitMoments } from "@/lib/schedule";
 import type { Habit, HabitMomentInfo } from "@/types";
 
 export default function HabitsSection() {
-  const { state, derived, toggleLog, deleteHabit, openHabitForm, openHabitDetail, todayShift } =
-    useApp();
-  const { habits, categories, logs, timetables, identities } = state;
+  const {
+    state,
+    derived,
+    toggleLog,
+    logStart,
+    clearStart,
+    deleteHabit,
+    openHabitForm,
+    openHabitDetail,
+    todayShift,
+  } = useApp();
+  const { habits, categories, logs, starts, timetables, identities } = state;
   const { stats } = derived;
   const [query, setQuery] = useState("");
   const t = today();
@@ -132,10 +141,13 @@ export default function HabitsSection() {
                 identities={identitiesForHabit(identities, habit)}
                 anchorName={habit.anchorHabitId ? habitNames[habit.anchorHabitId] : undefined}
                 logs={logs}
+                starts={starts}
                 stats={stats[habit.id]}
                 info={moments.get(habit.id)}
                 nowMinutes={now.minutes}
                 onToggle={toggleLog}
+                onStart={logStart}
+                onClearStart={clearStart}
                 onEdit={(h) => openHabitForm(h)}
                 onView={openHabitDetail}
                 onDelete={deleteHabit}
@@ -155,10 +167,13 @@ export default function HabitsSection() {
               identities={identities}
               habitNames={habitNames}
               logs={logs}
+              starts={starts}
               stats={stats}
               moments={moments}
               nowMinutes={now.minutes}
               onToggle={toggleLog}
+              onStart={logStart}
+              onClearStart={clearStart}
               onEdit={(habit) => openHabitForm(habit)}
               onView={openHabitDetail}
               onDelete={deleteHabit}

@@ -31,6 +31,8 @@ export interface AppContextValue {
   state: AppState;
   derived: DerivedData;
   toggleLog: Store["toggleLog"];
+  logStart: Store["logStart"];
+  clearStart: Store["clearStart"];
   markMissed: Store["markMissed"];
   unmarkMissed: Store["unmarkMissed"];
   saveMissedNote: Store["saveMissedNote"];
@@ -198,6 +200,8 @@ export default function AppProvider({ children }: { children: React.ReactNode })
       state,
       derived,
       toggleLog: store.toggleLog,
+      logStart: store.logStart,
+      clearStart: store.clearStart,
       markMissed: store.markMissed,
       unmarkMissed: store.unmarkMissed,
       saveMissedNote: store.saveMissedNote,

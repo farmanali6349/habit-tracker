@@ -43,8 +43,9 @@ const greeting = (): string => {
 };
 
 export default function DashboardSection() {
-  const { state, derived, toggleLog, setSleep, sleepGoal, todayShift } = useApp();
-  const { habits, categories, logs, sleep, timetables, missed, skips, identities } =
+  const { state, derived, toggleLog, setSleep, sleepGoal, todayShift, logStart, clearStart } =
+    useApp();
+  const { habits, categories, logs, sleep, timetables, missed, skips, identities, starts } =
     state;
   const { badges, feed, active, doneToday, todayPct, topStreak } = derived;
   const hasHistory = Object.keys(logs).length > 0 || timetables.length > 0;
@@ -82,9 +83,10 @@ export default function DashboardSection() {
         sleep,
         timetables,
         sleepGoal,
+        starts,
         skips,
       ),
-    [habits, categories, logs, sleep, timetables, sleepGoal, skips],
+    [habits, categories, logs, sleep, timetables, sleepGoal, starts, skips],
   );
 
   const earned = badges.filter((badge) => badge.earned).length;
@@ -123,9 +125,12 @@ export default function DashboardSection() {
         habits={habits}
         categories={categories}
         logs={logs}
+        starts={starts}
         timetables={timetables}
         shiftMinutes={todayShift}
         onToggle={toggleLog}
+        onStart={logStart}
+        onClearStart={clearStart}
       />
 
       <RecoveryCard />

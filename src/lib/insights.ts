@@ -6,6 +6,7 @@ import type {
   SkipLog,
   SleepGoal,
   SleepLog,
+  StartLog,
   TimeTable,
 } from "@/types";
 import { categoryStats, hourBuckets, planAccuracy, rankRange } from "./analytics";
@@ -15,6 +16,7 @@ import { addDays, today } from "./date";
 import { cycleStats, formatTime } from "./day";
 import { sleepTrend } from "./sleep";
 import { habitStats } from "./stats";
+import { timingInsights, timingSummaries } from "./timing";
 
 const SLEEP_GOOD_MINUTES = 420;
 
@@ -26,6 +28,7 @@ export const generateInsights = (
   sleep: SleepLog,
   timetables: TimeTable[],
   sleepGoal: SleepGoal,
+  starts: StartLog,
   skips?: SkipLog,
 ): Insight[] => {
   const insights: Insight[] = [];
@@ -232,5 +235,9 @@ export const generateInsights = (
     });
   }
 
-  return insights.slice(0, 6);
+  const timing = timingInsights(
+    timingSummaries(habits, logs, starts, timetables, sleep, sleepGoal),
+  );
+
+  return [...timing, ...insights].slice(0, 8);
 };

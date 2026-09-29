@@ -21,6 +21,7 @@ import type {
   HabitMomentInfo,
   HabitStats,
   Identity,
+  StartLog,
 } from "@/types";
 
 interface HabitGroupProps {
@@ -30,12 +31,15 @@ interface HabitGroupProps {
   /** habitId → name, for resolving stack anchors. */
   habitNames: Record<string, string>;
   logs: HabitLogs;
+  starts: StartLog;
   stats: Record<string, HabitStats>;
   /** habitId → live window + status for today. */
   moments: Map<string, HabitMomentInfo>;
   nowMinutes: number;
   defaultOpen?: boolean;
   onToggle: (id: string, date: string) => void;
+  onStart: (id: string, date: string) => void;
+  onClearStart: (id: string, date: string) => void;
   onEdit: (habit: Habit) => void;
   onView: (habit: Habit) => void;
   onDelete: (id: string) => void;
@@ -47,11 +51,14 @@ export default function HabitGroup({
   identities,
   habitNames,
   logs,
+  starts,
   stats,
   moments,
   nowMinutes,
   defaultOpen = true,
   onToggle,
+  onStart,
+  onClearStart,
   onEdit,
   onView,
   onDelete,
@@ -113,10 +120,13 @@ export default function HabitGroup({
                   habit.anchorHabitId ? habitNames[habit.anchorHabitId] : undefined
                 }
                 logs={logs}
+                starts={starts}
                 stats={stats[habit.id]}
                 info={moments.get(habit.id)}
                 nowMinutes={nowMinutes}
                 onToggle={onToggle}
+                onStart={onStart}
+                onClearStart={onClearStart}
                 onEdit={onEdit}
                 onView={onView}
                 onDelete={onDelete}

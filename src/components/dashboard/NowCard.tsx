@@ -1,12 +1,18 @@
 "use client";
 
-import { CheckIcon } from "lucide-react";
+import { CheckIcon, PlayIcon } from "lucide-react";
 import CategoryIcon from "@/components/CategoryIcon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { today } from "@/lib/date";
-import { formatTime, minutesToTime } from "@/lib/day";
+import {
+  formatDuration,
+  formatTime,
+  logTimeForDate,
+  minutesToTime,
+  timeToMinutes,
+} from "@/lib/day";
 import {
   compareByMoment,
   formatWindowEnd,
@@ -22,6 +28,7 @@ import type {
   Habit,
   HabitLogs,
   HabitMomentInfo,
+  StartLog,
   TimeTable,
 } from "@/types";
 
@@ -30,10 +37,13 @@ interface NowCardProps {
   habits: Habit[];
   categories: Category[];
   logs: HabitLogs;
+  starts: StartLog;
   timetables: TimeTable[];
   /** Wake-time adjustment applied to today's windows. */
   shiftMinutes?: number;
   onToggle: (id: string, date: string) => void;
+  onStart: (id: string, date: string) => void;
+  onClearStart: (id: string, date: string) => void;
 }
 
 const glow = (color: string) => ({
@@ -46,9 +56,12 @@ export default function NowCard({
   habits,
   categories,
   logs,
+  starts,
   timetables,
   shiftMinutes = 0,
   onToggle,
+  onStart,
+  onClearStart,
 }: NowCardProps) {
   const t = today();
   const categoryById = new Map(categories.map((c) => [c.id, c]));
@@ -73,6 +86,16 @@ export default function NowCard({
     info.habit.categoryId
       ? categoryById.get(info.habit.categoryId)?.color
       : undefined;
+
+  const startTime = (habitId: string): string | null => {
+    const iso = starts[habitId]?.[t];
+    return iso ? logTimeForDate(t, iso) : null;
+  };
+
+  const elapsed = (habitId: string): number => {
+    const time = startTime(habitId);
+    return time ? Math.max(0, now.minutes - timeToMinutes(time)) : 0;
+  };
 
   return (
     <Card>
@@ -151,6 +174,27 @@ export default function NowCard({
                   <CheckIcon data-icon="inline-start" />
                   Mark done
                 </Button>
+                {startTime(info.habit.id) ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3 ms-2 tabular-nums"
+                    onClick={() => onClearStart(info.habit.id, t)}
+                  >
+                    <PlayIcon data-icon="inline-start" />
+                    {formatDuration(elapsed(info.habit.id))}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3 ms-2"
+                    onClick={() => onStart(info.habit.id, t)}
+                  >
+                    <PlayIcon data-icon="inline-start" />
+                    Start
+                  </Button>
+                )}
               </div>
             );
           })

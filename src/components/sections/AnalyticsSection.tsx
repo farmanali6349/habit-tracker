@@ -56,7 +56,7 @@ const HEATMAP_CAP = 182;
 
 export default function AnalyticsSection() {
   const { state, derived } = useApp();
-  const { habits, categories, logs, sleep, timetables, missed, skips, sleepGoal } =
+  const { habits, categories, logs, sleep, timetables, missed, skips, sleepGoal, starts } =
     state;
   const { stats, badges } = derived;
 
@@ -90,8 +90,17 @@ export default function AnalyticsSection() {
 
   const insights = useMemo(
     () =>
-      generateInsights(habits, categories, logs, sleep, timetables, sleepGoal, skips),
-    [habits, categories, logs, sleep, timetables, sleepGoal, skips],
+      generateInsights(
+        habits,
+        categories,
+        logs,
+        sleep,
+        timetables,
+        sleepGoal,
+        starts,
+        skips,
+      ),
+    [habits, categories, logs, sleep, timetables, sleepGoal, starts, skips],
   );
 
   const perfectStreak = useMemo(

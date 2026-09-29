@@ -120,7 +120,11 @@ export function useHabitStore() {
       const logs = { ...(x.logs[id] || {}) };
       if (logs[d]) {
         delete logs[d];
-        return { logs: { ...x.logs, [id]: logs } };
+        // Undoing a check-in also drops the start that measured it.
+        return {
+          logs: { ...x.logs, [id]: logs },
+          starts: withoutDate(x.starts, id, d),
+        };
       }
       // Completing a habit clears any "missed" or "rest day" flag for that day.
       logs[d] = new Date().toISOString();
@@ -148,6 +152,17 @@ export function useHabitStore() {
     }
   }, []);
 
+  /** Records when a habit was started, so completion can report the duration. */
+  const logStart = useCallback((id: string, date: string, iso?: string) => {
+    patchState((x) => ({
+      starts: withDate(x.starts, id, date, iso ?? new Date().toISOString()),
+    }));
+  }, []);
+
+  const clearStart = useCallback((id: string, date: string) => {
+    patchState((x) => ({ starts: withoutDate(x.starts, id, date) }));
+  }, []);
+
   const markMissed = useCallback((id: string, date: string) => {
     patchState((x) => {
       const existing = x.missed[id]?.[date];
@@ -163,6 +178,7 @@ export function useHabitStore() {
         logs: { ...x.logs, [id]: logs },
         progress: withoutDate(x.progress, id, date),
         skips: withoutDate(x.skips, id, date),
+        starts: withoutDate(x.starts, id, date),
         missed: withMissedDate(x.missed, id, date, entry),
       };
     });
@@ -181,6 +197,7 @@ export function useHabitStore() {
         progress: withoutDate(x.progress, id, date),
         missed: withMissedDate(x.missed, id, date, null),
         skips: withDate(x.skips, id, date, true as const),
+        starts: withoutDate(x.starts, id, date),
       };
     });
   }, []);
@@ -288,6 +305,8 @@ export function useHabitStore() {
       delete progress[id];
       const skips = { ...x.skips };
       delete skips[id];
+      const starts = { ...x.starts };
+      delete starts[id];
       // Detach any habits stacked after this one.
       return {
         habits: x.habits.map((h) =>
@@ -297,6 +316,7 @@ export function useHabitStore() {
         missed,
         progress,
         skips,
+        starts,
       };
     });
   }, []);
@@ -541,6 +561,8 @@ export function useHabitStore() {
     state,
     update,
     toggleLog,
+    logStart,
+    clearStart,
     markMissed,
     unmarkMissed,
     saveMissedNote,

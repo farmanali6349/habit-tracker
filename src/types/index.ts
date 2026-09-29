@@ -108,6 +108,9 @@ export interface HabitMomentInfo {
 
 export type HabitLogs = Record<string, Record<string, string>>;
 
+/** habitId → "YYYY-MM-DD" → ISO timestamp the habit was started. */
+export type StartLog = Record<string, Record<string, string>>;
+
 /** habitId → "YYYY-MM-DD" → amount logged (for habits with a numeric target). */
 export type ProgressLog = Record<string, Record<string, number>>;
 
@@ -211,6 +214,8 @@ export interface AppState {
   categories: Category[];
   identities: Identity[];
   logs: HabitLogs;
+  /** habitId → date → ISO timestamp the habit was started, for time tracking. */
+  starts: StartLog;
   /** habitId → date → amount logged, for habits with a numeric target. */
   progress: ProgressLog;
   /** habitId → date → true, for planned rest/skip days. */

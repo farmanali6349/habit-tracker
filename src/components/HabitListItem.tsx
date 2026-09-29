@@ -9,6 +9,7 @@ import {
   LinkIcon,
   MoreHorizontalIcon,
   PencilIcon,
+  PlayIcon,
   TrashIcon,
 } from "lucide-react";
 import {
@@ -38,6 +39,7 @@ import {
 import CategoryBadge from "./CategoryBadge";
 import { frequencyLabel, isScheduled, isWeeklyQuota } from "@/lib/cadence";
 import { addDays, today } from "@/lib/date";
+import { formatDuration, logTimeForDate, timeToMinutes } from "@/lib/day";
 import { formatWindowEnd, progressPct, windowLabel } from "@/lib/schedule";
 import { isActive } from "@/lib/stats";
 import { cn } from "@/lib/utils";
@@ -48,6 +50,7 @@ import type {
   HabitMomentInfo,
   HabitStats,
   Identity,
+  StartLog,
 } from "@/types";
 
 const STRIP_DAYS = 14;
@@ -58,11 +61,15 @@ interface HabitListItemProps {
   identities?: Identity[];
   anchorName?: string;
   logs: HabitLogs;
+  /** habitId → date → ISO start timestamp, for the running-timer affordance. */
+  starts: StartLog;
   stats: HabitStats;
   /** Live window + status for today, if the habit is active. */
   info?: HabitMomentInfo;
   nowMinutes: number;
   onToggle: (id: string, date: string) => void;
+  onStart: (id: string, date: string) => void;
+  onClearStart: (id: string, date: string) => void;
   onEdit: (habit: Habit) => void;
   onView: (habit: Habit) => void;
   onDelete: (id: string) => void;
@@ -74,10 +81,13 @@ export default function HabitListItem({
   identities = [],
   anchorName,
   logs,
+  starts,
   stats,
   info,
   nowMinutes,
   onToggle,
+  onStart,
+  onClearStart,
   onEdit,
   onView,
   onDelete,
@@ -87,6 +97,13 @@ export default function HabitListItem({
   const log = logs[habit.id] || {};
   const active = isActive(habit, t);
   const done = Boolean(log[t]);
+
+  const startTime = starts[habit.id]?.[t]
+    ? logTimeForDate(t, starts[habit.id][t])
+    : null;
+  const elapsed = startTime
+    ? Math.max(0, nowMinutes - timeToMinutes(startTime))
+    : 0;
 
   const window = info?.window ?? null;
   const moment = info?.moment;
@@ -106,22 +123,48 @@ export default function HabitListItem({
           : undefined
       }
     >
-      <Button
-        variant={done ? "default" : "outline"}
-        size="icon"
-        disabled={!active}
-        aria-pressed={done}
-        aria-label={`${
-          done ? "Undo" : isLimit ? "Mark resisted" : "Mark"
-        } ${habit.name}`}
-        onClick={() => onToggle(habit.id, t)}
-        className={cn(
-          "size-10 shrink-0 rounded-full",
-          done && "bg-success text-success-foreground hover:bg-success/90",
-        )}
-      >
-        <CheckIcon className={cn("size-4", !done && "opacity-0")} />
-      </Button>
+      <div className="flex shrink-0 flex-col items-center gap-1.5">
+        <Button
+          variant={done ? "default" : "outline"}
+          size="icon"
+          disabled={!active}
+          aria-pressed={done}
+          aria-label={`${
+            done ? "Undo" : isLimit ? "Mark resisted" : "Mark"
+          } ${habit.name}`}
+          onClick={() => onToggle(habit.id, t)}
+          className={cn(
+            "size-10 shrink-0 rounded-full",
+            done && "bg-success text-success-foreground hover:bg-success/90",
+          )}
+        >
+          <CheckIcon className={cn("size-4", !done && "opacity-0")} />
+        </Button>
+
+        {active && !done && startTime ? (
+          <Button
+            variant="ghost"
+            size="xs"
+            className="text-[11px] tabular-nums text-success"
+            aria-label={`Clear start for ${habit.name}`}
+            onClick={() => onClearStart(habit.id, t)}
+          >
+            <PlayIcon data-icon="inline-start" />
+            {formatDuration(elapsed)}
+          </Button>
+        ) : active && !done ? (
+          <Button
+            variant="ghost"
+            size="xs"
+            className="text-[11px] text-muted-foreground"
+            aria-label={`Start ${habit.name}`}
+            onClick={() => onStart(habit.id, t)}
+          >
+            <PlayIcon data-icon="inline-start" />
+            Start
+          </Button>
+        ) : null}
+      </div>
 
       <div className="min-w-0 flex-1 space-y-2">
         <div className="flex items-start gap-2">

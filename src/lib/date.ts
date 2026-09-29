@@ -15,3 +15,11 @@ export const diffDays = (a: string, b: string): number =>
   Math.round(
     (new Date(b + "T00:00:00").getTime() - new Date(a + "T00:00:00").getTime()) / 864e5,
   );
+
+/** Local "YYYY-MM-DD" + "HH:MM" → ISO timestamp of that wall-clock moment. */
+export const isoFromTime = (date: string, time: string): string => {
+  const [hours, minutes] = time.split(":").map(Number);
+  const d = new Date(`${date}T00:00:00`);
+  d.setHours(hours, minutes, 0, 0);
+  return d.toISOString();
+};

@@ -16,6 +16,7 @@ import type {
   SleepEntry,
   SleepGoal,
   SleepLog,
+  StartLog,
   TimeSlot,
   TimeTable,
   WeeklyReview,
@@ -39,6 +40,7 @@ export const defaultState = (): AppState => ({
   categories: [uncategorizedCategory()],
   identities: [],
   logs: {},
+  starts: {},
   progress: {},
   skips: {},
   sleep: {},
@@ -211,6 +213,22 @@ const sanitizeIdentityIds = (
   // Back-compat: pre-multi-identity backups stored a single `identityId`.
   if (typeof legacy === "string" && valid.has(legacy)) ids.push(legacy);
   return [...new Set(ids)];
+};
+
+const sanitizeStarts = (raw: unknown): StartLog => {
+  if (!raw || typeof raw !== "object") return {};
+  const out: StartLog = {};
+  for (const [habitId, dates] of Object.entries(
+    raw as Record<string, Record<string, unknown>>,
+  )) {
+    if (!dates || typeof dates !== "object") continue;
+    const byDate: Record<string, string> = {};
+    for (const [date, value] of Object.entries(dates)) {
+      if (typeof value === "string" && value) byDate[date] = value;
+    }
+    if (Object.keys(byDate).length) out[habitId] = byDate;
+  }
+  return out;
 };
 
 const sanitizeProgress = (raw: unknown): ProgressLog => {
@@ -451,6 +469,7 @@ export const migrateState = (raw: unknown): AppState | null => {
     categories,
     identities,
     logs: input.logs ?? {},
+    starts: sanitizeStarts(input.starts),
     progress: sanitizeProgress(input.progress),
     skips: sanitizeSkips(input.skips),
     sleep: sanitizeSleep(input.sleep),

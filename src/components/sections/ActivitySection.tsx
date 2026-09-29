@@ -5,12 +5,16 @@ import {
   CheckIcon,
   ChevronDownIcon,
   NotebookPenIcon,
+  PlayIcon,
   SearchIcon,
   StickyNoteIcon,
+  TimerIcon,
   XIcon,
 } from "lucide-react";
 import CategoryIcon from "../CategoryIcon";
 import StatTile from "../StatTile";
+import TimingCard from "../analytics/TimingCard";
+import TimeField from "../TimeField";
 import { useApp } from "@/components/shell/AppProvider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,17 +33,27 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useNow } from "@/hooks/useNow";
 import {
   activityStats,
   buildActivityDays,
   type ActivityDay,
   type ActivityEntry,
 } from "@/lib/activity";
-import { formatTime } from "@/lib/day";
-import { buildFeed } from "@/lib/stats";
+import { isoFromTime, today } from "@/lib/date";
+import { formatDuration, formatTime, minutesToTime, timeToMinutes } from "@/lib/day";
+import { buildFeed, isActive } from "@/lib/stats";
+import { sessionTimings, timingByKey, timingInsights, timingSummaries } from "@/lib/timing";
 import { cn } from "@/lib/utils";
 import type { Category } from "@/types";
 
@@ -50,11 +64,20 @@ const FEED_LIMIT = 500;
 interface RowProps {
   entry: ActivityEntry;
   category?: Category;
+  nowMinutes: number;
   onRemoveNote: (id: string) => void;
 }
 
-function ActivityRow({ entry, category, onRemoveNote }: RowProps) {
+function ActivityRow({ entry, category, nowMinutes, onRemoveNote }: RowProps) {
   const isHabit = entry.kind === "habit";
+  const isStart = entry.kind === "start";
+  const isTracked = isHabit || isStart;
+  const isToday = entry.day === today();
+
+  const elapsed =
+    isStart && isToday && entry.startedAt
+      ? Math.max(0, nowMinutes - timeToMinutes(entry.startedAt))
+      : null;
 
   return (
     <div className="group flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-muted/50">
@@ -62,10 +85,10 @@ function ActivityRow({ entry, category, onRemoveNote }: RowProps) {
         aria-hidden
         className={cn(
           "flex size-7 shrink-0 items-center justify-center rounded-lg",
-          !isHabit && "bg-muted text-muted-foreground",
+          !isTracked && "bg-muted text-muted-foreground",
         )}
         style={
-          isHabit
+          isTracked
             ? {
                 color: category?.color ?? "var(--success)",
                 backgroundColor: category
@@ -81,6 +104,8 @@ function ActivityRow({ entry, category, onRemoveNote }: RowProps) {
           ) : (
             <CheckIcon className="size-3.5" />
           )
+        ) : isStart ? (
+          <PlayIcon className="size-3.5" />
         ) : (
           <StickyNoteIcon className="size-3.5" />
         )}
@@ -90,7 +115,7 @@ function ActivityRow({ entry, category, onRemoveNote }: RowProps) {
         <p
           className={cn(
             "text-sm whitespace-pre-wrap break-words",
-            isHabit && "font-medium",
+            isTracked && "font-medium",
           )}
         >
           {entry.text}
@@ -98,13 +123,64 @@ function ActivityRow({ entry, category, onRemoveNote }: RowProps) {
         {category && (
           <p className="text-xs text-muted-foreground">{category.name}</p>
         )}
+
+        {isHabit && entry.startedAt && entry.endedAt && (
+          <p className="text-xs tabular-nums text-muted-foreground">
+            {formatTime(entry.startedAt)} → {formatTime(entry.endedAt)}
+            {entry.durationMinutes !== null &&
+              ` · ${formatDuration(entry.durationMinutes)}`}
+          </p>
+        )}
+        {isHabit && !entry.startedAt && entry.endedAt && (
+          <p className="text-xs tabular-nums text-muted-foreground">
+            Completed {formatTime(entry.endedAt)}
+          </p>
+        )}
+        {isStart && (
+          <p className="text-xs tabular-nums text-muted-foreground">
+            Started {entry.startedAt ? formatTime(entry.startedAt) : "—"}
+            {elapsed !== null
+              ? ` · ${formatDuration(elapsed)} so far`
+              : " · not completed"}
+          </p>
+        )}
       </div>
+
+      {isHabit &&
+        entry.durationMinutes !== null &&
+        entry.allocatedMinutes !== null && (
+          <Badge
+            variant="outline"
+            className={cn(
+              "shrink-0 tabular-nums",
+              entry.durationMinutes <= entry.allocatedMinutes
+                ? "border-success/40 text-success"
+                : "border-warning/40 text-warning",
+            )}
+          >
+            planned {formatDuration(entry.allocatedMinutes)}
+          </Badge>
+        )}
+
+      {isStart &&
+        (isToday ? (
+          <Badge
+            variant="outline"
+            className="shrink-0 border-success/40 text-success"
+          >
+            In progress
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="shrink-0 text-muted-foreground">
+            Unfinished
+          </Badge>
+        ))}
 
       <span className="w-16 shrink-0 text-end text-xs tabular-nums text-muted-foreground">
         {entry.time ? formatTime(entry.time) : ""}
       </span>
 
-      {!isHabit && (
+      {!isTracked && (
         <Button
           variant="ghost"
           size="icon-xs"
@@ -122,10 +198,11 @@ function ActivityRow({ entry, category, onRemoveNote }: RowProps) {
 interface DayGroupProps {
   day: ActivityDay;
   categoryById: Map<string, Category>;
+  nowMinutes: number;
   onRemoveNote: (id: string) => void;
 }
 
-function DayGroup({ day, categoryById, onRemoveNote }: DayGroupProps) {
+function DayGroup({ day, categoryById, nowMinutes, onRemoveNote }: DayGroupProps) {
   return (
     <Collapsible
       defaultOpen
@@ -157,6 +234,7 @@ function DayGroup({ day, categoryById, onRemoveNote }: DayGroupProps) {
                 category={
                   entry.habitId ? categoryById.get(entry.habitId) : undefined
                 }
+                nowMinutes={nowMinutes}
                 onRemoveNote={onRemoveNote}
               />
             </li>
@@ -168,27 +246,56 @@ function DayGroup({ day, categoryById, onRemoveNote }: DayGroupProps) {
 }
 
 export default function ActivitySection() {
-  const { state, addNote, removeNote } = useApp();
-  const { habits, categories, logs, notes } = state;
+  const { state, addNote, removeNote, logStart } = useApp();
+  const { habits, categories, logs, notes, starts, timetables, sleep, sleepGoal } =
+    state;
+
+  const t = today();
+  const now = useNow();
 
   const [note, setNote] = useState("");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FeedFilter>("all");
+  const [startHabitId, setStartHabitId] = useState("");
+  const [startTime, setStartTime] = useState(() => {
+    const at = new Date();
+    return minutesToTime(at.getHours() * 60 + at.getMinutes());
+  });
 
   const categoryById = useMemo(
     () => new Map(categories.map((category) => [category.id, category])),
     [categories],
   );
 
+  const timingsList = useMemo(
+    () => sessionTimings(habits, logs, starts, timetables, sleep, sleepGoal),
+    [habits, logs, starts, timetables, sleep, sleepGoal],
+  );
+  const timings = useMemo(() => timingByKey(timingsList), [timingsList]);
+
+  const summaries = useMemo(
+    () => timingSummaries(habits, logs, starts, timetables, sleep, sleepGoal),
+    [habits, logs, starts, timetables, sleep, sleepGoal],
+  );
+  const timing = useMemo(() => timingInsights(summaries), [summaries]);
+
   const feed = useMemo(
     () => buildFeed(habits, logs, notes, FEED_LIMIT),
     [habits, logs, notes],
   );
-  const days = useMemo(() => buildActivityDays(feed), [feed]);
+  const days = useMemo(() => buildActivityDays(feed, timings), [feed, timings]);
   const stats = useMemo(
-    () => activityStats(habits, logs, notes),
-    [habits, logs, notes],
+    () => activityStats(habits, logs, notes, timingsList),
+    [habits, logs, notes, timingsList],
   );
+
+  const startable = useMemo(
+    () => habits.filter((habit) => isActive(habit, t) && !logs[habit.id]?.[t]),
+    [habits, logs, t],
+  );
+  const startTarget = startable.some((habit) => habit.id === startHabitId)
+    ? startHabitId
+    : "";
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -215,9 +322,14 @@ export default function ActivitySection() {
     setNote("");
   };
 
+  const submitStart = () => {
+    if (!startTarget) return;
+    logStart(startTarget, t, isoFromTime(t, startTime));
+  };
+
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <StatTile
           label="Check-ins today"
           value={String(stats.checkinsToday)}
@@ -229,9 +341,20 @@ export default function ActivitySection() {
           icon={<StickyNoteIcon className="size-3.5" />}
         />
         <StatTile
+          label="Tracked today"
+          value={formatDuration(stats.trackedToday)}
+          hint="time on habits"
+          icon={<TimerIcon className="size-3.5" />}
+        />
+        <StatTile
           label="Last 7 days"
           value={String(stats.checkinsWeek)}
           hint="check-ins"
+        />
+        <StatTile
+          label="Tracked 7 days"
+          value={formatDuration(stats.trackedWeek)}
+          hint="time on habits"
         />
         <StatTile
           label="All-time"
@@ -239,6 +362,50 @@ export default function ActivitySection() {
           hint={`${stats.totalNotes} ${stats.totalNotes === 1 ? "note" : "notes"}`}
         />
       </div>
+
+      <Card>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <TimerIcon className="size-4 shrink-0 text-muted-foreground" />
+            <span className="text-sm font-medium">Log a start</span>
+            <span className="text-xs text-muted-foreground">
+              Start a habit now — completing it later records the time it took.
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={startTarget} onValueChange={setStartHabitId}>
+              <SelectTrigger
+                aria-label="Habit to start"
+                className="w-full sm:w-56"
+              >
+                <SelectValue placeholder="Choose a habit" />
+              </SelectTrigger>
+              <SelectContent>
+                {startable.length ? (
+                  startable.map((habit) => (
+                    <SelectItem key={habit.id} value={habit.id}>
+                      {habit.name}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="__none" disabled>
+                    No habits to start
+                  </SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+            <TimeField value={startTime} onChange={setStartTime} />
+            <Button
+              type="button"
+              disabled={!startTarget}
+              onClick={submitStart}
+            >
+              <PlayIcon data-icon="inline-start" />
+              Log start
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardContent>
@@ -272,6 +439,21 @@ export default function ActivitySection() {
               </Button>
             </div>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <TimerIcon className="size-4 shrink-0 text-muted-foreground" />
+            <span className="text-sm font-medium">Time tracking</span>
+            <span className="text-xs text-muted-foreground">
+              Actual time vs allocated, averaged per habit.
+            </span>
+          </div>
+          <div className="mt-3">
+            <TimingCard summaries={summaries} insights={timing} />
+          </div>
         </CardContent>
       </Card>
 
@@ -311,6 +493,7 @@ export default function ActivitySection() {
               key={day.day}
               day={day}
               categoryById={categoryById}
+              nowMinutes={now.minutes}
               onRemoveNote={removeNote}
             />
           ))}
